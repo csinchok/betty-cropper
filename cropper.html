@@ -1,0 +1,62 @@
+<html>
+	<head>
+		<title>Image Cropper</title>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+		<script src="../js/jquery.Jcrop.min.js"></script>
+		<script type="text/javascript">
+		  var aspect_ratios = [
+		  	'1x1',
+		  	'4x3',
+		  	'16x9',
+		  ];
+		  jQuery(function($){
+
+		  	for(var i=0;i<aspect_ratios.length;i++) {
+		  		var height = 200 * aspect_ratios[i][1] / aspect_ratios[i][0];
+		  		$("#menu").append('<div class="preview" style="height: ' + height + 'px;line-height:' + height + 'px">' + aspect_ratios[i][0] + 'x' + aspect_ratios[i][1] + '</div>')
+		  		// $("#menu").append('<img src="../../{{ .ImageId }}/original/200.jpg" id="target" />');
+		  	}
+
+		    // How easy is this??
+		    $('#target').Jcrop();
+		  });
+		</script>
+		<style>
+			#editor {
+				width: 500px;
+				padding: 20px;
+				float: left;
+				border: 1px solid black;
+			}
+			#menu {
+				width: 230px;
+				border: 1px solid black;
+				float: left;
+				margin-left: 20px;
+				overflow: scroll;
+				height: 322px;
+			}
+			#menu .preview {
+				width: 200px;
+				background: url(../../{{ .ImageId }}/original/500.jpg);
+				margin: 15px;
+				text-align: center;
+				vertical-align: middle;
+				color: white;
+				font-family: Helvetica;
+				font-weight: bold;
+				font-size: 2.5em;
+				-webkit-text-stroke: 1px black;
+				background-size: 150%;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="editor">
+			<img src="../../{{ .ImageId }}/original/500.jpg" id="target" />
+		</div>
+		<div id="menu">
+
+		</div>
+	</body>
+</html>
