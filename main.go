@@ -12,7 +12,7 @@ import (
     "html/template"
     "os"
     "fmt"
-    "imaging"
+    "github.com/disintegration/imaging"
 )
 
 var pwd, _ = os.Getwd()
@@ -59,9 +59,6 @@ func imageCrop(image_id string, image_ratio string) image.Image {
     var selection = defaultSelection(src.Bounds().Max, aspect_ratio)
 
     return imaging.Crop(src, selection)
-}
-
-func admin(w http.ResponseWriter, r *http.Request) {
 }
 
 func cropper(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +192,7 @@ func main() {
     
     http.HandleFunc("/cropper/", cropper)
     http.HandleFunc("/api/new", newImage)
+    http.HandleFunc("/api/", api)
 
     http.HandleFunc("/", handler)
     http.ListenAndServe(":8888", nil)
