@@ -2,61 +2,132 @@
 	<head>
 		<title>Image Cropper</title>
 		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
-		<script src="../js/jquery.Jcrop.min.js"></script>
+		<script src="js/jquery.Jcrop.min.js"></script>
 		<script type="text/javascript">
 		  var aspect_ratios = [
-		  	'1x1',
-		  	'4x3',
-		  	'16x9',
+		  	{{range .Ratios}}
+			[{{.X}},{{.Y}}],
+			{{end}}
 		  ];
+
+		  var selections = [
+		  	{{range .Selections}}
+			[[{{.Min.X}},{{.Min.Y}}],[{{.Max.X}},{{.Max.Y}}]],
+			{{end}}
+		  ];
+
+		  var PREVIEW_HEIGHT = 175;
+
+		  function updateSelection(c) {
+		  	console.log(c);
+		  }
+
 		  jQuery(function($){
 
+		  	var img_src = "../../{{ .ImageId }}/original/600.jpg";
 		  	for(var i=0;i<aspect_ratios.length;i++) {
-		  		var height = 200 * aspect_ratios[i][1] / aspect_ratios[i][0];
-		  		$("#menu").append('<div class="preview" style="height: ' + height + 'px;line-height:' + height + 'px">' + aspect_ratios[i][0] + 'x' + aspect_ratios[i][1] + '</div>')
-		  		// $("#menu").append('<img src="../../{{ .ImageId }}/original/200.jpg" id="target" />');
+		  		var width = PREVIEW_HEIGHT * aspect_ratios[i][0] / aspect_ratios[i][1];
+		  		var preview_div = $('<div class="preview"><div class="label">' + aspect_ratios[i][0] + "x" + aspect_ratios[i][1] + '</div><div class="container"><img src="' + img_src + '" /></div></div>');
+		  		preview_div.find(".container").css({
+		  			'width': width,
+		  			'height': PREVIEW_HEIGHT
+		  		});
+		  		preview_div.attr("data-aspect-width", aspect_ratios[i][0]);
+		  		preview_div.attr("data-aspect-height", aspect_ratios[i][1]);
+		  		preview_div.attr("data-index", i);
+
+		  		var crop_width = selections[i][1][0] - selections[i][0][0];
+		  		var crop_height = selections[i][1][1] - selections[i][0][1];
+
+		  		var rx = width / crop_width;
+		  		var ry = PREVIEW_HEIGHT / crop_height;
+
+		  		preview_div.find("img").css({
+		  			width: Math.round(rx * {{.Size.X}}) + "px",
+		  			height: Math.round(ry * {{.Size.Y}}) + "px",
+			        marginLeft: '-' + Math.round(rx * selections[i][0][0]) + 'px',
+			        marginTop: '-' + Math.round(ry * selections[i][0][1]) + 'px'
+		  		});
+
+		  		preview_div.on('click', function() {
+		  			$("#previews").hide();
+		  			$("#cropper").show();
+		  			var aspectWidth = parseInt($(this).attr("data-aspect-width"));
+		  			var aspectHeight = parseInt($(this).attr("data-aspect-height"));
+		  			jcrop_api.setOptions({aspectRatio: aspectWidth / aspectHeight});
+		  			jcrop_api.focus();
+
+		  			var ratioIndex = parseInt($(this).attr("data-index"));
+
+		  			// aspect_ratios.indexOf([aspectWidth, aspectHeight]);
+		  			console.log([aspectWidth, aspectHeight]);
+		  			var selection = selections[ratioIndex];
+		  			jcrop_api.setSelect([selection[0][0], selection[0][1], selection[1][0], selection[1][1]]);
+		  		});
+
+		  		$("#previews").append(preview_div)
 		  	}
 
-		    // How easy is this??
-		    $('#target').Jcrop();
+		  	var jcrop_api;
+		    $('#target').Jcrop({
+      			onSelect: updateSelection,
+      			allowMove: true,
+      			allowResize: true
+		    }, function() {
+		    	jcrop_api = this;
+		    });
 		  });
 		</script>
 		<style>
-			#editor {
-				width: 500px;
-				padding: 20px;
+			.preview {
 				float: left;
-				border: 1px solid black;
+				display: block;
+				z-index: 2000;
+				position: relative;
+
+				padding: 6px;
+				margin: 10px;
+
+  				border: 1px rgba(0,0,0,.4) solid;
+  				background-color: white;
+
+  				-webkit-border-radius: 6px;
+				-moz-border-radius: 6px;
+				border-radius: 6px;
+
+				-webkit-box-shadow: 1px 1px 5px 2px rgba(0, 0, 0, 0.2);
+				-moz-box-shadow: 1px 1px 5px 2px rgba(0, 0, 0, 0.2);
+				box-shadow: 1px 1px 5px 2px rgba(0, 0, 0, 0.2);
+
+				cursor: pointer;
 			}
-			#menu {
-				width: 230px;
-				border: 1px solid black;
-				float: left;
-				margin-left: 20px;
-				overflow: scroll;
-				height: 322px;
+			.container {
+				overflow: hidden;
+				background-color: black;
 			}
-			#menu .preview {
-				width: 200px;
-				background: url(../../{{ .ImageId }}/original/500.jpg);
-				margin: 15px;
-				text-align: center;
-				vertical-align: middle;
+			.label {
+				z-index: 1500;
+				position: absolute;
+				width:95%;
+				margin-right: 6px;
+				text-align:center;
+				line-height: 175px;
 				color: white;
-				font-family: Helvetica;
-				font-weight: bold;
-				font-size: 2.5em;
-				-webkit-text-stroke: 1px black;
-				background-size: 150%;
+				font-family: Arial, Helvetica;
+				font-size: 2em;
+				overflow: hidden;
+			}
+			.preview:hover .container img {
+				opacity: 0.4;
+			}
+			#cropper {
+				display: none;
 			}
 		</style>
+		<link rel="stylesheet" href="css/jquery.Jcrop.min.css" type="text/css" />
 	</head>
 	<body>
-		<div id="editor">
-			<img src="../../{{ .ImageId }}/original/500.jpg" id="target" />
-		</div>
-		<div id="menu">
-
-		</div>
+		<div id="previews"></div>
+		<div id="cropper"><img id="target" src="../../{{ .ImageId }}/original/600.jpg" /></div>
 	</body>
 </html>
