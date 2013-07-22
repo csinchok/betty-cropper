@@ -98,9 +98,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 }
 
 func api(w http.ResponseWriter, r *http.Request) {
-    if r.URL.Path == "/api/new" {
 
-    }
 }
 
 func newImage(w http.ResponseWriter, r *http.Request) {
@@ -183,9 +181,14 @@ func main() {
     flag.Parse()
 
     file_list, _ := ioutil.ReadDir(*image_root)
-    var last_directory = file_list[len(file_list) - 1]
-    last_id, _ := strconv.Atoi(last_directory.Name())
-    next_id = last_id + 1
+    if len(file_list) == 0 {
+        next_id = 1
+    } else {
+        var last_directory = file_list[len(file_list) - 1]
+        last_id, _ := strconv.Atoi(last_directory.Name())
+        next_id = last_id + 1
+    }
+
 
     http.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir("./js"))))
     http.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir("./css"))))
