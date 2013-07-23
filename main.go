@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
     "strconv"
+    "encoding/json"
     "image"
 	"image/png"
 	"image/jpeg"
@@ -98,7 +99,40 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 }
 
 func api(w http.ResponseWriter, r *http.Request) {
+    if r.Method != "POST" {
+        http.Error(w, "POST only, you asshole.", 405)
+        return
+    }
 
+    var path_segments = strings.Split(r.URL.Path, "/")
+    var image_id = path_segments[2]
+    var image_ratio = path_segments[3]
+
+    minX, err := strconv.Atoi(r.FormValue("minX"))
+    minY, err := strconv.Atoi(r.FormValue("minY"))
+
+    maxX, err := strconv.Atoi(r.FormValue("maxX"))
+    maxY, err := strconv.Atoi(r.FormValue("maxY"))
+
+    var selections map[string]image.Rectangle
+
+    var selection_json_path = *image_root + "/" + image_id + "/selections.json"
+
+    selection_bytes, err :=  ioutil.ReadFile(selection_json_path)
+    if err == nil {
+        json.Unmarshal(selection_bytes, &selections)
+        fmt.Println(selections)
+    }
+
+    // TODO: validate image ratio
+    selections[image_ratio] = image.Rectangle{
+        image.Point{minX, minY},
+        image.Point{maxX, maxY},
+    }
+
+    data, err := json.Marshal(selections)
+    err = ioutil.WriteFile(selection_json_path, data, 0777) 
+    
 }
 
 func newImage(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +150,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
     data, err := ioutil.ReadAll(file) 
     if err != nil { 
         http.Error(w, "File error", 500)
-    } 
+    }
     
     var image_id = next_id
     next_id += 1
@@ -131,7 +165,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func crop(w http.ResponseWriter, r *http.Request) {
 	
  	var path_segments = strings.Split(r.URL.Path, "/")
  	if len(path_segments) != 4 {
@@ -139,7 +173,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
         return
  	}
  	
-    var image_id = path_segments[1] 	
+    var image_id = path_segments[1]
  	var image_ratio = path_segments[2]
     var filename = path_segments[3]
 
@@ -197,6 +231,6 @@ func main() {
     http.HandleFunc("/api/new", newImage)
     http.HandleFunc("/api/", api)
 
-    http.HandleFunc("/", handler)
+    http.HandleFunc("/", crop)
     http.ListenAndServe(":8888", nil)
 }
