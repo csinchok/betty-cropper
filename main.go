@@ -17,24 +17,50 @@ import (
 	"strings"
 )
 
-var pwd, _ = os.Getwd()
-var image_root = flag.String("root", pwd, "The root of the image directory")
+// TODOs: Shouldn't be opening the image file more than once.
+// Memcached integration
+// Admin interface on a different ip
+// CamelCase
 
-var admin_address = flag.String("admin", ":9999", "The ip and port that the admin will listen on")
-var public_address = flag.String("public", ":8888", "The ip and port that the public facing cropper will listen on")
+
+var pwd, _ = os.Getwd()
+
+var config_path = flag.String("config", "config.json", "Path for the config file")
+var imageRoot, adminAddress, publicAddress string  // Global config variables
 
 var next_id = -1
+
+func loadConfig() {
+
+    type Config struct {
+        ImageRoot string // Where we put out images
+        AdminAddress string // The address that the admin API is served from
+        PublicAddress string // The address that the public interface is served from
+        Ratios []string // A list of image ratios that we'll be cropping for
+    }
+
+    var config Config
+    if config_path != nil {
+        config_bytes, err := ioutil.ReadFile(*config_path)
+        if err == nil {
+            json.Unmarshal(config_bytes, &config)
+            adminAddress = config.AdminAddress
+            publicAddress = config.PublicAddress
+            imageRoot = config.ImageRoot
+        }
+    }
+
+
+}
 
 
 func getSelection(image_id string, image_size image.Point, image_ratio string) image.Rectangle {
 
-    var selection_json_path = *image_root + "/" + image_id + "/selections.json"
+    var selection_json_path = imageRoot + "/" + image_id + "/selections.json"
     var selections map[string]image.Rectangle
     selection_bytes, err := ioutil.ReadFile(selection_json_path)
     if err == nil {
-        // fmt.Println("Unmarshaling")
         json.Unmarshal(selection_bytes, &selections)
-        // fmt.Println(selections)
     } else {
         // TODO: Make dynamic based on the number of ratios
         selections = make(map[string]image.Rectangle, 5)
@@ -44,7 +70,7 @@ func getSelection(image_id string, image_size image.Point, image_ratio string) i
         return selection
     }
 
-    src, err := imaging.Open(*image_root + "/" + image_id + "/src")
+    src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
     if err != nil {
         fmt.Println("Couldn't find an image. Did you set the image root?")
     }
@@ -78,7 +104,7 @@ func getSelection(image_id string, image_size image.Point, image_ratio string) i
 }
 
 func imageCrop(image_id string, image_ratio string) image.Image {
-	src, err := imaging.Open(*image_root + "/" + image_id + "/src")
+	src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
 	if err != nil {
 		fmt.Println("Couldn't find an image. Did you set the image root?")
 	}
@@ -91,7 +117,7 @@ func imageCrop(image_id string, image_ratio string) image.Image {
 func cropper(w http.ResponseWriter, r *http.Request) {
 	var image_id = strings.Split(r.URL.Path, "/")[2]
 
-	src, err := imaging.Open(*image_root + "/" + image_id + "/src")
+	src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
     var imageScale = 600.0 / float64(src.Bounds().Max.X)
 
 	if err != nil {
@@ -158,7 +184,7 @@ func api(w http.ResponseWriter, r *http.Request) {
 
 	var selections map[string]image.Rectangle
 
-	var selection_json_path = *image_root + "/" + image_id + "/selections.json"
+	var selection_json_path = imageRoot + "/" + image_id + "/selections.json"
 
 	selection_bytes, err := ioutil.ReadFile(selection_json_path)
 	if err == nil {
@@ -200,8 +226,8 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	var image_id = next_id
 	next_id += 1
 
-	_ = os.MkdirAll(*image_root+"/"+strconv.Itoa(image_id), 0700)
-	err = ioutil.WriteFile(*image_root+"/"+strconv.Itoa(image_id)+"/src", data, 0777)
+	_ = os.MkdirAll(imageRoot+"/"+strconv.Itoa(image_id), 0700)
+	err = ioutil.WriteFile(imageRoot+"/"+strconv.Itoa(image_id)+"/src", data, 0777)
 	if err != nil {
 		http.Error(w, "IO error", 500)
 	}
@@ -224,7 +250,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	var dst = imageCrop(image_id, image_ratio)
 
-    src, _ := imaging.Open(*image_root + "/" + image_id + "/src")
+    src, _ := imaging.Open(imageRoot + "/" + image_id + "/src")
     var width = src.Bounds().Max.X
 
     if strings.Split(filename, ".")[0] != "original" {
@@ -240,8 +266,8 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	dst = imaging.Resize(dst, int(width), 0, imaging.CatmullRom)
 
-	_ = os.MkdirAll(*image_root+"/"+image_id+"/"+image_ratio, 0700)
-	output_writer, _ := os.Create(*image_root + r.URL.Path)
+	_ = os.MkdirAll(imageRoot+"/"+image_id+"/"+image_ratio, 0700)
+	output_writer, _ := os.Create(imageRoot + r.URL.Path)
 
 	if format == "jpg" {
 
@@ -264,7 +290,9 @@ func crop(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
-	file_list, _ := ioutil.ReadDir(*image_root)
+    loadConfig()
+
+	file_list, _ := ioutil.ReadDir(imageRoot)
 	if len(file_list) == 0 {
 		next_id = 1
 	} else {
@@ -280,5 +308,5 @@ func main() {
 	http.HandleFunc("/api/", api)
 
 	http.HandleFunc("/", crop)
-	http.ListenAndServe(*public_address, nil)
+	http.ListenAndServe(publicAddress, nil)
 }

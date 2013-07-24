@@ -1,0 +1,12 @@
+{
+	"ImageRoot": "/Users/csinchok/Development/SimpleImageServer/image_root",
+	"AdminAddress": ":9999",
+	"PublicAddress": ":8888",
+	"Ratios": [
+		"1x1",
+		"2x1",
+		"3x4",
+		"4x3",
+		"16x9"
+	]
+}
