@@ -25,10 +25,11 @@ import (
 
 var pwd, _ = os.Getwd()
 
-var config_path = flag.String("config", "config.json", "Path for the config file")
+var configPath = flag.String("config", pwd + "/config.json", "Path for the config file")
 var imageRoot, adminAddress, publicAddress string  // Global config variables
+var ratios []image.Point
 
-var next_id = -1
+var nextId = -1
 
 func loadConfig() {
 
@@ -40,45 +41,48 @@ func loadConfig() {
     }
 
     var config Config
-    if config_path != nil {
-        config_bytes, err := ioutil.ReadFile(*config_path)
+    if configPath != nil {
+        configBytes, err := ioutil.ReadFile(*configPath)
         if err == nil {
-            json.Unmarshal(config_bytes, &config)
+            json.Unmarshal(configBytes, &config)
             adminAddress = config.AdminAddress
             publicAddress = config.PublicAddress
             imageRoot = config.ImageRoot
+            return
         }
     }
-
+    adminAddress = ":9999"
+    publicAddress = ":8888"
+    imageRoot = "/tmp/image_root"
 
 }
 
 
-func getSelection(image_id string, image_size image.Point, image_ratio string) image.Rectangle {
+func getSelection(imageId string, image_size image.Point, imageRatio string) image.Rectangle {
 
-    var selection_json_path = imageRoot + "/" + image_id + "/selections.json"
+    var selectionJsonPath = imageRoot + "/" + imageId + "/selections.json"
     var selections map[string]image.Rectangle
-    selection_bytes, err := ioutil.ReadFile(selection_json_path)
+    selectionBytes, err := ioutil.ReadFile(selectionJsonPath)
     if err == nil {
-        json.Unmarshal(selection_bytes, &selections)
+        json.Unmarshal(selectionBytes, &selections)
     } else {
         // TODO: Make dynamic based on the number of ratios
         selections = make(map[string]image.Rectangle, 5)
     }
     // TODO: maybe pss the string into this?
-    if selection, ok := selections[image_ratio]; ok {
+    if selection, ok := selections[imageRatio]; ok {
         return selection
     }
 
-    src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
+    src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
     if err != nil {
         fmt.Println("Couldn't find an image. Did you set the image root?")
     }
 
     var aspect_ratio = src.Bounds().Max
-    if image_ratio != "original" {
-        var w, _ = strconv.Atoi(strings.Split(image_ratio, "x")[0])
-        var h, _ = strconv.Atoi(strings.Split(image_ratio, "x")[1])
+    if imageRatio != "original" {
+        var w, _ = strconv.Atoi(strings.Split(imageRatio, "x")[0])
+        var h, _ = strconv.Atoi(strings.Split(imageRatio, "x")[1])
         aspect_ratio = image.Point{w, h}
     }
 
@@ -103,21 +107,21 @@ func getSelection(image_id string, image_size image.Point, image_ratio string) i
 	return image.Rectangle{min, max}
 }
 
-func imageCrop(image_id string, image_ratio string) image.Image {
-	src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
+func imageCrop(imageId string, imageRatio string) image.Image {
+	src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
 	if err != nil {
 		fmt.Println("Couldn't find an image. Did you set the image root?")
 	}
 
-	var selection = getSelection(image_id, src.Bounds().Max, image_ratio)
+	var selection = getSelection(imageId, src.Bounds().Max, imageRatio)
 
 	return imaging.Crop(src, selection)
 }
 
 func cropper(w http.ResponseWriter, r *http.Request) {
-	var image_id = strings.Split(r.URL.Path, "/")[2]
+	var imageId = strings.Split(r.URL.Path, "/")[2]
 
-	src, err := imaging.Open(imageRoot + "/" + image_id + "/src")
+	src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
     var imageScale = 600.0 / float64(src.Bounds().Max.X)
 
 	if err != nil {
@@ -136,15 +140,15 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
     // TODO: get selection from disk
 	for i, ratio := range ratios {
-        var image_ratio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
-		selections[i] = getSelection(image_id, src.Bounds().Max, image_ratio)
+        var imageRatio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
+		selections[i] = getSelection(imageId, src.Bounds().Max, imageRatio)
 	}
 
 	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
 
 	t, _ := template.ParseFiles("cropper.html")
 	t.Execute(w, map[string]interface{}{
-		"ImageId":    image_id,
+		"ImageId":    imageId,
 		"Ratios":     ratios,
 		"Selections": selections,
 		"ScaledSize": scaled_size,
@@ -160,9 +164,9 @@ func api(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var path_segments = strings.Split(r.URL.Path, "/")
-	var image_id = path_segments[2]
-	var image_ratio = path_segments[3]
+	var pathSegments = strings.Split(r.URL.Path, "/")
+	var imageId = pathSegments[2]
+	var imageRatio = pathSegments[3]
 
 	minX, err := strconv.Atoi(r.FormValue("minX"))
     if err != nil {
@@ -184,7 +188,7 @@ func api(w http.ResponseWriter, r *http.Request) {
 
 	var selections map[string]image.Rectangle
 
-	var selection_json_path = imageRoot + "/" + image_id + "/selections.json"
+	var selection_json_path = imageRoot + "/" + imageId + "/selections.json"
 
 	selection_bytes, err := ioutil.ReadFile(selection_json_path)
 	if err == nil {
@@ -195,7 +199,7 @@ func api(w http.ResponseWriter, r *http.Request) {
     }
 
 	// TODO: validate image ratio
-	selections[image_ratio] = image.Rectangle{
+	selections[imageRatio] = image.Rectangle{
 		image.Point{minX, minY},
 		image.Point{maxX, maxY},
 	}
@@ -223,11 +227,11 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "File error", 500)
 	}
 
-	var image_id = next_id
-	next_id += 1
+	var image_id = nextId
+	nextId += 1
 
-	_ = os.MkdirAll(imageRoot+"/"+strconv.Itoa(image_id), 0700)
-	err = ioutil.WriteFile(imageRoot+"/"+strconv.Itoa(image_id)+"/src", data, 0777)
+	_ = os.MkdirAll(imageRoot + "/" + strconv.Itoa(image_id), 0700)
+	err = ioutil.WriteFile(imageRoot + "/" + strconv.Itoa(image_id) + "/src", data, 0777)
 	if err != nil {
 		http.Error(w, "IO error", 500)
 	}
@@ -267,19 +271,18 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	dst = imaging.Resize(dst, int(width), 0, imaging.CatmullRom)
 
 	_ = os.MkdirAll(imageRoot+"/"+image_id+"/"+image_ratio, 0700)
-	output_writer, _ := os.Create(imageRoot + r.URL.Path)
+	outputWriter, _ := os.Create(imageRoot + r.URL.Path)
 
 	if format == "jpg" {
-
 		w.Header().Set("Content-Type", "image/jpeg")
 		jpeg.Encode(w, dst, &jpeg.Options{jpeg.DefaultQuality})
-		jpeg.Encode(output_writer, dst, &jpeg.Options{jpeg.DefaultQuality})
+		jpeg.Encode(outputWriter, dst, &jpeg.Options{jpeg.DefaultQuality})
 		return
 	}
 	if format == "png" {
 		w.Header().Set("Content-Type", "image/png")
 		png.Encode(w, dst)
-		png.Encode(output_writer, dst)
+		png.Encode(outputWriter, dst)
 		return
 	}
 
@@ -292,13 +295,13 @@ func main() {
 
     loadConfig()
 
-	file_list, _ := ioutil.ReadDir(imageRoot)
-	if len(file_list) == 0 {
-		next_id = 1
+	fileList, _ := ioutil.ReadDir(imageRoot)
+	if len(fileList) == 0 {
+		nextId = 1
 	} else {
-		var last_directory = file_list[len(file_list)-1]
-		last_id, _ := strconv.Atoi(last_directory.Name())
-		next_id = last_id + 1
+		var lastDirectory = fileList[len(fileList)-1]
+		lastId, _ := strconv.Atoi(lastDirectory.Name())
+		nextId = lastId + 1
 	}
 
 	http.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir("./js"))))
