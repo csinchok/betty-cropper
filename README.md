@@ -1,8 +1,12 @@
 To run this on a mac:
 
+
     > brew install go
+    > git clone git@gitlab.onion.com:csinchok/simpleimageserver.git
+    > cd simpleimageserver
     > cp config.json.example config.json  # And edit the config accordingly...
-    > go build -o server && ./server --root=/Users/csinchok/Development/SimpleImageServer/config.json # Obviously change this path.
+    > export GOPATH=/Users/csinchok/Development/simpleimageserver/  # Change this to your project path.
+    > go build -o server && ./server --root=/Users/csinchok/Development/simpleimageserver/config.json # Obviously change this path.
 
 API:
 
