@@ -23,3 +23,4 @@ TODOs:
 - Memcached integration
 - overall DRY'ing things up
 - make ratios based on config file (currently hardcoded)
+- Add JPEG quality option
