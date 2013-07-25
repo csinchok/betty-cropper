@@ -24,3 +24,4 @@ TODOs:
 - overall DRY'ing things up
 - make ratios based on config file (currently hardcoded)
 - Add JPEG quality option
+- Remove cropped files after a selection changes.
