@@ -23,9 +23,10 @@ import (
 // CamelCase
 
 
-var pwd, _ = os.Getwd()
+var configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
 
-var configPath = flag.String("config", pwd + "/config.json", "Path for the config file")
+var staticPath = flag.String("static", "/etc/betty-cropper/static/", "Path for the config file")
+
 var imageRoot, adminAddress, publicAddress string  // Global config variables
 var ratios []image.Point
 
@@ -53,7 +54,7 @@ func loadConfig() {
     }
     adminAddress = ":9999"
     publicAddress = ":8888"
-    imageRoot = "/tmp/image_root"
+    imageRoot = "/var/betty-cropper"
 
 }
 
@@ -146,7 +147,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
 	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
 
-	t, _ := template.ParseFiles("cropper.html")
+	t, _ := template.ParseFiles(*staticPath + "/html/cropper.html")
 	t.Execute(w, map[string]interface{}{
 		"ImageId":    imageId,
 		"Ratios":     ratios,
@@ -304,8 +305,8 @@ func main() {
 		nextId = lastId + 1
 	}
 
-	http.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir("./js"))))
-	http.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir("./css"))))
+	http.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir(*staticPath + "/js"))))
+	http.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir(*staticPath + "/css"))))
 	http.HandleFunc("/cropper/", cropper)
 	http.HandleFunc("/api/new", newImage)
 	http.HandleFunc("/api/", api)

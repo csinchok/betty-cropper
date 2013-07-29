@@ -1,5 +1,5 @@
 {
-	"ImageRoot": "/Users/csinchok/Development/SimpleImageServer/image_root",
+	"ImageRoot": "/var/betty-cropper",
 	"AdminAddress": ":9999",
 	"PublicAddress": ":8888",
 	"Ratios": [

@@ -5,8 +5,8 @@ To run this on a mac:
     > git clone git@gitlab.onion.com:csinchok/simpleimageserver.git
     > cd simpleimageserver
     > cp config.json.example config.json  # And edit the config accordingly...
-    > export GOPATH=/Users/csinchok/Development/simpleimageserver/  # Change this to your project path.
-    > go build -o server && ./server --root=/Users/csinchok/Development/simpleimageserver/config.json # Obviously change this path.
+    > export GOPATH=/Users/csinchok/Development/betty-cropper/  # Change this to your project path.
+    > go build bettycropper && ./bettycropper --config=/Users/csinchok/Development/simpleimageserver/config.json # Obviously change this path.
 
 API:
 
