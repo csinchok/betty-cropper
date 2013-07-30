@@ -4,7 +4,7 @@
 # description: betty-cropper daemon
 # processname: betty-cropper
 
-DAEMON_PATH="/usr/local/bin/betty-cropper"
+DAEMON_PATH="/usr/local/bin/"
 
 DAEMON=betty-cropper
 DAEMONOPTS="--config=/etc/betty-cropper/config.json"
