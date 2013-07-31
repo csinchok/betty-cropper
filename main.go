@@ -49,6 +49,14 @@ func loadConfig() {
             adminAddress = config.AdminAddress
             publicAddress = config.PublicAddress
             imageRoot = config.ImageRoot
+
+            ratios = make([]image.Point, len(config.Ratios))
+            // ratios = [config.Ratios.len()]image.Point
+            for index,ratio := range config.Ratios {
+            	var w, _ = strconv.Atoi(strings.Split(ratio, "x")[0])
+            	var h, _ = strconv.Atoi(strings.Split(ratio, "x")[1])
+            	ratios[index] = image.Pt(w, h)
+            }
             return
         }
     }
@@ -127,14 +135,6 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println("Couldn't find an image. Did you set the image root?")
-	}
-
-	ratios := []image.Point{
-		image.Point{1, 1},
-		image.Point{2, 1},
-		image.Point{3, 4},
-		image.Point{4, 3},
-		image.Point{16, 9},
 	}
 
 	var selections = make([]image.Rectangle, len(ratios))
