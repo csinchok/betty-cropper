@@ -20,7 +20,6 @@
 
 
 		  function save(e) {
-		  	console.log("Saving");
 		  	var index = $("#cropper").attr("data-index");
 		  	$("div.preview[data-index='" + index + "']").removeClass("modified");
 		  	var scaledSelection = selections[index];
@@ -97,7 +96,7 @@
 		  	});
 
 
-		  	var img_src = "../../{{ .ImageId }}/original/600.jpg";
+		  	var img_src = "{{ .PublicAddress }}/{{ .ImageId }}/original/600.jpg";
 		  	for(var i=0;i<aspect_ratios.length;i++) {
 		  		var aspect_ratio = aspect_ratios[i];
 
@@ -215,7 +214,7 @@
 				<button class="save" onclick="save();return false;">Save</button>
 				<button class="save-and-back" onclick="save();back();return false;">Save &amp; Close</button>
 			</div>
-			<img id="target" src="../../{{ .ImageId }}/original/600.jpg" />
+			<img id="target" src="{{ .PublicAddress }}/{{ .ImageId }}/original/600.jpg" />
 		</div>
 	</body>
 </html>

@@ -9,6 +9,8 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"image/draw"
+	"image/color"
     "math"
 	"io/ioutil"
 	"net/http"
@@ -20,25 +22,41 @@ import (
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
 // Admin interface on a different ip
-// CamelCase
 
 
 var configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
-
 var staticPath = flag.String("static", "/etc/betty-cropper/static/", "Path for the config file")
 
-var imageRoot, adminAddress, publicAddress string  // Global config variables
+var imageRoot, adminListen, publicListen, publicAddress string  // Global config variables
+var debug bool
 var ratios []image.Point
 
 var nextId = -1
 
 func loadConfig() {
+	if _, err := os.Stat(*staticPath); err != nil {
+	    if os.IsNotExist(err) {
+	    	workingDir, _ := os.Getwd()
+	    	fmt.Printf("Static path \"%s\" doesn't exist. Using \"%s\" instead.\n", *staticPath, workingDir)
+	        *staticPath = workingDir
+
+	    }
+	}
+
+	if _, err := os.Stat(*configPath); err != nil {
+		fmt.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
+		os.Exit(1)
+	}
+
 
     type Config struct {
-        ImageRoot string // Where we put out images
-        AdminAddress string // The address that the admin API is served from
-        PublicAddress string // The address that the public interface is served from
-        Ratios []string // A list of image ratios that we'll be cropping for
+        ImageRoot string `json:"imageRoot"` // Where we put out images
+        AdminListen string `json:"adminListen"` // The address that the admin API is served from
+        PublicListen string `json:"publicListen"` // The address that the public interface is served from
+        
+        PublicAddress string `json:"publicAddress"` // The address that the public interface is served from
+        Ratios []string `json:"ratios"` // A list of image ratios that we'll be cropping for
+        Debug bool `json:"debug"` // If debug is true or false
     }
 
     var config Config
@@ -46,9 +64,12 @@ func loadConfig() {
         configBytes, err := ioutil.ReadFile(*configPath)
         if err == nil {
             json.Unmarshal(configBytes, &config)
-            adminAddress = config.AdminAddress
+            adminListen = config.AdminListen
+            publicListen = config.PublicListen
             publicAddress = config.PublicAddress
             imageRoot = config.ImageRoot
+
+            debug = config.Debug
 
             ratios = make([]image.Point, len(config.Ratios))
             // ratios = [config.Ratios.len()]image.Point
@@ -60,14 +81,26 @@ func loadConfig() {
             return
         }
     }
-    adminAddress = ":9999"
-    publicAddress = ":8888"
+    adminListen = ":9999"
+    publicListen = ":8888"
+    publicAddress = "http://localhost:8888"
     imageRoot = "/var/betty-cropper"
 
 }
 
+func ratioStringToPoint(imageRatio string) image.Point {
+    var w, _ = strconv.Atoi(strings.Split(imageRatio, "x")[0])
+    var h, _ = strconv.Atoi(strings.Split(imageRatio, "x")[1])
+    return image.Point{w, h}
+}
 
-func getSelection(imageId string, image_size image.Point, imageRatio string) image.Rectangle {
+func ratioPointToString(imageRatio image.Point) string {
+	return ""
+}
+
+
+// TODO: Should imageRatio really be a string?
+func getSelection(imageId string, imageSize image.Point, imageRatio string) image.Rectangle {
 
     var selectionJsonPath = imageRoot + "/" + imageId + "/selections.json"
     var selections map[string]image.Rectangle
@@ -90,27 +123,25 @@ func getSelection(imageId string, image_size image.Point, imageRatio string) ima
 
     var aspect_ratio = src.Bounds().Max
     if imageRatio != "original" {
-        var w, _ = strconv.Atoi(strings.Split(imageRatio, "x")[0])
-        var h, _ = strconv.Atoi(strings.Split(imageRatio, "x")[1])
-        aspect_ratio = image.Point{w, h}
+        aspect_ratio = ratioStringToPoint(imageRatio)
     }
 
-	var original_ratio = float64(image_size.X) / float64(image_size.Y)
+	var original_ratio = float64(imageSize.X) / float64(imageSize.Y)
 	var selection_ratio = float64(aspect_ratio.X) / float64(aspect_ratio.Y)
 
 	var min = image.Pt(0, 0)
-	var max = image_size
+	var max = imageSize
 
 	if selection_ratio < original_ratio {
-		var x_offset = (float64(image_size.X) - (float64(image_size.Y) * float64(aspect_ratio.X) / float64(aspect_ratio.Y))) / 2.0
+		var x_offset = (float64(imageSize.X) - (float64(imageSize.Y) * float64(aspect_ratio.X) / float64(aspect_ratio.Y))) / 2.0
 		min = image.Pt(int(math.Floor(x_offset)), 0)
-		max = image.Pt(image_size.X - int(math.Floor(x_offset)), image_size.Y)
+		max = image.Pt(imageSize.X - int(math.Floor(x_offset)), imageSize.Y)
 	}
 	if selection_ratio > original_ratio {
-		var y_offset = (float64(image_size.Y) - (float64(image_size.X) * float64(aspect_ratio.Y) / float64(aspect_ratio.X))) / 2.0
+		var y_offset = (float64(imageSize.Y) - (float64(imageSize.X) * float64(aspect_ratio.Y) / float64(aspect_ratio.X))) / 2.0
 
 		min = image.Pt(0, int(math.Floor(y_offset)))
-		max = image.Pt(image_size.X, image_size.Y - int(math.Floor(y_offset)))
+		max = image.Pt(imageSize.X, imageSize.Y - int(math.Floor(y_offset)))
 	}
 
 	return image.Rectangle{min, max}
@@ -154,6 +185,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 		"Selections": selections,
 		"ScaledSize": scaled_size,
         "ImageScale": imageScale,
+        "PublicAddress": publicAddress,
 	})
 
 	// t.Execute(w, Cropper{ImageId: image_id, Ratios: &ratios})
@@ -241,6 +273,29 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{\"id\":%d}", image_id)
 }
 
+
+func placeholder(w http.ResponseWriter, imageRatio string, width int, format string) {
+
+	var ratio = ratioStringToPoint(imageRatio)
+	var size = image.Rect(0, 0, width, int(math.Floor(float64(width) * float64(ratio.Y) / float64(ratio.X))))
+	var dst = image.NewRGBA(size)
+	blue := color.RGBA{204, 204, 204, 255}
+	draw.Draw(dst, dst.Bounds(), &image.Uniform{blue}, image.ZP, draw.Src)
+
+	if format == "jpg" {
+		w.Header().Set("Content-Type", "image/jpeg")
+		jpeg.Encode(w, dst, &jpeg.Options{jpeg.DefaultQuality})
+		return
+	}
+	if format == "png" {
+		w.Header().Set("Content-Type", "image/png")
+		png.Encode(w, dst)
+		return
+	}
+
+}
+
+
 func crop(w http.ResponseWriter, r *http.Request) {
 
 	var path_segments = strings.Split(r.URL.Path, "/")
@@ -250,18 +305,11 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var image_id = path_segments[1]
-	var image_ratio = path_segments[2]
+	var imageRatio = path_segments[2]
 	var filename = path_segments[3]
 
-	var dst = imageCrop(image_id, image_ratio)
 
-    src, _ := imaging.Open(imageRoot + "/" + image_id + "/src")
-    var width = src.Bounds().Max.X
-
-    if strings.Split(filename, ".")[0] != "original" {
-        width, _ = strconv.Atoi(strings.Split(filename, ".")[0])
-    }
-    
+    width, _ := strconv.Atoi(strings.Split(filename, ".")[0])
 	if width > 9000 {
 		http.Error(w, "Enhance your calm, bro.", 420)
 		return
@@ -269,9 +317,23 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	var format = strings.Split(filename, ".")[1]
 
+    _, err := imaging.Open(imageRoot + "/" + image_id + "/src")
+	if err != nil {
+    	if debug {
+    		placeholder(w, imageRatio, width, format)
+    		return
+
+    		
+    	} else {
+    		http.Error(w, "Couldn't find that.", 404)
+    		return
+    	}
+    }
+
+	var dst = imageCrop(image_id, imageRatio)
 	dst = imaging.Resize(dst, int(width), 0, imaging.CatmullRom)
 
-	_ = os.MkdirAll(imageRoot+"/"+image_id+"/"+image_ratio, 0700)
+	_ = os.MkdirAll(imageRoot+"/"+image_id+"/"+imageRatio, 0700)
 	outputWriter, _ := os.Create(imageRoot + r.URL.Path)
 
 	if format == "jpg" {
@@ -305,12 +367,28 @@ func main() {
 		nextId = lastId + 1
 	}
 
-	http.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir(*staticPath + "/js"))))
-	http.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir(*staticPath + "/css"))))
-	http.HandleFunc("/cropper/", cropper)
-	http.HandleFunc("/api/new", newImage)
-	http.HandleFunc("/api/", api)
+	var adminServeMux = http.NewServeMux()
+	var adminServer = http.Server{
+		Addr: adminListen,
+		Handler: adminServeMux,
+	}
 
-	http.HandleFunc("/", crop)
-	http.ListenAndServe(publicAddress, nil)
+	var publicServeMux = http.NewServeMux()
+	var publicServer = http.Server {
+		Addr: publicListen,
+		Handler: publicServeMux,
+	}
+
+	publicServeMux.HandleFunc("/", crop)
+	go func() {
+		publicServer.ListenAndServe()
+	}()
+
+	adminServeMux.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir(*staticPath + "/js"))))
+	adminServeMux.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir(*staticPath + "/css"))))
+	adminServeMux.HandleFunc("/cropper/", cropper)
+	adminServeMux.HandleFunc("/api/new", newImage)
+	adminServeMux.HandleFunc("/api/", api)
+	adminServer.ListenAndServe()
+	
 }

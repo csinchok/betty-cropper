@@ -1,12 +1,14 @@
 {
-	"ImageRoot": "/var/betty-cropper",
-	"AdminAddress": ":9999",
-	"PublicAddress": ":8888",
-	"Ratios": [
+	"imageRoot": "/var/betty-cropper",
+	"adminListen": ":9999",
+	"publicListen": ":8888",
+	"publicAddress": "http://localhost:8888",
+	"ratios": [
 		"1x1",
 		"2x1",
 		"3x4",
 		"4x3",
 		"16x9"
-	]
+	],
+	"debug": "true"
 }
