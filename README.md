@@ -31,9 +31,8 @@ This should return an image id ("1", if this is the first image). You can then v
 
 ### TODOs
 
-- Have the admin listen on a different interface.
 - Memcached integration
 - overall DRY'ing things up
-- make ratios based on config file (currently hardcoded)
 - Add JPEG quality option
 - Remove cropped files after a selection changes.
+- Allow image deletion
