@@ -18,8 +18,6 @@ import (
 	"strings"
 	"log"
 
-	// "bettycropper/static"
-
 	"github.com/disintegration/imaging"
 	"code.google.com/p/freetype-go/freetype"
 )
@@ -30,7 +28,6 @@ import (
 
 var (
 	configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
-	staticPath = flag.String("static", "/etc/betty-cropper/static/", "Path for the config file")
 )
 
 var imageRoot, adminListen, publicListen, publicAddress string  // Global config variables
@@ -40,14 +37,6 @@ var ratios []image.Point
 var nextId = -1
 
 func loadConfig() {
-	if _, err := os.Stat(*staticPath); err != nil {
-	    if os.IsNotExist(err) {
-	    	workingDir, _ := os.Getwd()
-	    	fmt.Printf("Static path \"%s\" doesn't exist. Using \"%s\" instead.\n", *staticPath, workingDir)
-	        *staticPath = workingDir
-
-	    }
-	}
 
 	if _, err := os.Stat(*configPath); err != nil {
 		fmt.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
@@ -164,7 +153,7 @@ func imageCrop(imageId string, imageRatio string) image.Image {
 	return imaging.Crop(src, selection)
 }
 
-func cropper(w http.ResponseWriter, r *http.Request) {
+func cropper(w http.ResponseWriter, r *http.Request) {	
 	var imageId = strings.Split(r.URL.Path, "/")[2]
 
 	src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
@@ -404,6 +393,33 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func js(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/cropper/js/jquery.color.js" {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Write(jquery_color_js())
+		return;
+	}
+	if r.URL.Path == "/cropper/js/jquery.Jcrop.min.js" {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Write(jquery_jcrop_js())
+		return;
+	}
+}
+
+func css(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/cropper/css/Jcrop.gif" {
+		w.Header().Set("Content-Type", "image/gif")
+		w.Write(jcrop_gif())
+		return;
+	}
+	if r.URL.Path == "/cropper/css/jquery.Jcrop.min.css" {
+		w.Header().Set("Content-Type", "text/css")
+		w.Write(jcrop_css())
+		return;
+	}
+	http.Error(w, "Couldn't find that.", 404)
+}
+
 func main() {
 	flag.Parse()
 
@@ -435,9 +451,12 @@ func main() {
 		publicServer.ListenAndServe()
 	}()
 
-	adminServeMux.Handle("/cropper/js/", http.StripPrefix("/cropper/js", http.FileServer(http.Dir(*staticPath + "/js"))))
-	adminServeMux.Handle("/cropper/css/", http.StripPrefix("/cropper/css", http.FileServer(http.Dir(*staticPath + "/css"))))
+	adminServeMux.HandleFunc("/cropper/js/", js)
+	adminServeMux.HandleFunc("/cropper/css/", css)
+
 	adminServeMux.HandleFunc("/cropper/", cropper)
+
+
 	adminServeMux.HandleFunc("/api/new", newImage)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
