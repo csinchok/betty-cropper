@@ -271,6 +271,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 
 
 func placeholder(w http.ResponseWriter, imageRatio string, width int, format string) {
+	// TODO: Don't do so much stupid shit with this font stuff.
 
 	var ratio = ratioStringToPoint(imageRatio)
 	var size = image.Rect(0, 0, width, int(math.Floor(float64(width) * float64(ratio.Y) / float64(ratio.X))))
@@ -278,49 +279,48 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
 	backgroundColor := color.RGBA{204, 204, 204, 255}
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
 
-	fontBytes, err := ioutil.ReadFile("/Library/Fonts/Microsoft/Lucida Sans Unicode.ttf")
-    if err == nil {
-	    font, err := freetype.ParseFont(fontBytes)
-	    if err != nil {
-	        log.Println(err)
-	        return
-	    }
 
-	    var txtImage = image.NewRGBA(image.Rect(0, 0, 600, 600))
-	    draw.Draw(txtImage, txtImage.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
-
-	    darkGrey := image.NewUniform(color.RGBA{150, 150, 150, 255})
-
-	    var fontSize = float64(width) * 52 / 300  // Stupid magic number
-
-		c := freetype.NewContext()
-		c.SetDPI(72)
-		c.SetFont(font)
-		c.SetFontSize(fontSize)
-		c.SetClip(txtImage.Bounds())
-		c.SetDst(txtImage)
-		c.SetSrc(darkGrey)
-
-		var offsetFix = int(math.Floor(fontSize * 12 / 72))  // Stupid magic number
-
-		pt := freetype.Pt(0, int(c.PointToFix32(fontSize) >> 8) - offsetFix)
-		pt, err = c.DrawString(imageRatio, pt)
-	    if err != nil {
-	        log.Println(err)
-	        return
-	    }
-
-	    txtSize := image.Pt(int(pt.X >> 8), int(c.PointToFix32(fontSize) >> 8) + 2)
-
-	    txtBounds := image.Rect(
-	    	int(math.Floor(float64(size.Max.X) / 2.0) - (float64(txtSize.X) / 2.0)),
-	    	int(math.Floor(float64(size.Max.Y) / 2.0) - (float64(txtSize.Y) / 2.0)),
-	    	int(math.Floor(float64(size.Max.X) / 2.0) + (float64(txtSize.X) / 2.0)),
-	    	int(math.Floor(float64(size.Max.Y) / 2.0) + (float64(txtSize.Y) / 2.0)),
-	    )
-
-	    draw.Draw(dst, txtBounds, txtImage, image.ZP, draw.Src)
+    font, err := freetype.ParseFont(lucida_font())
+    if err != nil {
+        log.Println(err)
+        return
     }
+
+    var txtImage = image.NewRGBA(image.Rect(0, 0, 600, 600))
+    draw.Draw(txtImage, txtImage.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
+
+    darkGrey := image.NewUniform(color.RGBA{150, 150, 150, 255})
+
+    var fontSize = float64(width) * 52 / 300  // Stupid magic number
+
+	c := freetype.NewContext()
+	c.SetDPI(72)
+	c.SetFont(font)
+	c.SetFontSize(fontSize)
+	c.SetClip(txtImage.Bounds())
+	c.SetDst(txtImage)
+	c.SetSrc(darkGrey)
+
+	var offsetFix = int(math.Floor(fontSize * 12 / 72))  // Stupid magic number
+
+	pt := freetype.Pt(0, int(c.PointToFix32(fontSize) >> 8) - offsetFix)
+	pt, err = c.DrawString(imageRatio, pt)
+    if err != nil {
+        log.Println(err)
+        return
+    }
+
+    txtSize := image.Pt(int(pt.X >> 8), int(c.PointToFix32(fontSize) >> 8) + 2)
+
+    txtBounds := image.Rect(
+    	int(math.Floor(float64(size.Max.X) / 2.0) - (float64(txtSize.X) / 2.0)),
+    	int(math.Floor(float64(size.Max.Y) / 2.0) - (float64(txtSize.Y) / 2.0)),
+    	int(math.Floor(float64(size.Max.X) / 2.0) + (float64(txtSize.X) / 2.0)),
+    	int(math.Floor(float64(size.Max.Y) / 2.0) + (float64(txtSize.Y) / 2.0)),
+    )
+
+    draw.Draw(dst, txtBounds, txtImage, image.ZP, draw.Src)
+
 
 	if format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
