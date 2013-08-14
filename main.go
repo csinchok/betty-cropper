@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/disintegration/imaging"
 	"html/template"
 	"image"
 	"image/jpeg"
@@ -17,15 +16,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"log"
+
+	// "bettycropper/static"
+
+	"github.com/disintegration/imaging"
+	"code.google.com/p/freetype-go/freetype"
 )
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
 // Admin interface on a different ip
 
-
-var configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
-var staticPath = flag.String("static", "/etc/betty-cropper/static/", "Path for the config file")
+var (
+	configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
+	staticPath = flag.String("static", "/etc/betty-cropper/static/", "Path for the config file")
+)
 
 var imageRoot, adminListen, publicListen, publicAddress string  // Global config variables
 var debug bool
@@ -178,7 +184,8 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
 	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
 
-	t, _ := template.ParseFiles(*staticPath + "/html/cropper.html")
+	t := template.New("cropper.html")
+	t.Parse(string(cropper_html()))
 	t.Execute(w, map[string]interface{}{
 		"ImageId":    imageId,
 		"Ratios":     ratios,
@@ -279,12 +286,56 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
 	var ratio = ratioStringToPoint(imageRatio)
 	var size = image.Rect(0, 0, width, int(math.Floor(float64(width) * float64(ratio.Y) / float64(ratio.X))))
 	var dst = image.NewRGBA(size)
-	blue := color.RGBA{204, 204, 204, 255}
-	draw.Draw(dst, dst.Bounds(), &image.Uniform{blue}, image.ZP, draw.Src)
+	backgroundColor := color.RGBA{204, 204, 204, 255}
+	draw.Draw(dst, dst.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
+
+	fontBytes, err := ioutil.ReadFile("/Library/Fonts/Microsoft/Lucida Sans Unicode.ttf")
+    if err == nil {
+	    font, err := freetype.ParseFont(fontBytes)
+	    if err != nil {
+	        log.Println(err)
+	        return
+	    }
+
+	    var txtImage = image.NewRGBA(image.Rect(0, 0, 600, 600))
+	    draw.Draw(txtImage, txtImage.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
+
+	    darkGrey := image.NewUniform(color.RGBA{150, 150, 150, 255})
+
+	    var fontSize = float64(width) * 52 / 300  // Stupid magic number
+
+		c := freetype.NewContext()
+		c.SetDPI(72)
+		c.SetFont(font)
+		c.SetFontSize(fontSize)
+		c.SetClip(txtImage.Bounds())
+		c.SetDst(txtImage)
+		c.SetSrc(darkGrey)
+
+		var offsetFix = int(math.Floor(fontSize * 12 / 72))  // Stupid magic number
+
+		pt := freetype.Pt(0, int(c.PointToFix32(fontSize) >> 8) - offsetFix)
+		pt, err = c.DrawString(imageRatio, pt)
+	    if err != nil {
+	        log.Println(err)
+	        return
+	    }
+
+	    txtSize := image.Pt(int(pt.X >> 8), int(c.PointToFix32(fontSize) >> 8) + 2)
+
+	    txtBounds := image.Rect(
+	    	int(math.Floor(float64(size.Max.X) / 2.0) - (float64(txtSize.X) / 2.0)),
+	    	int(math.Floor(float64(size.Max.Y) / 2.0) - (float64(txtSize.Y) / 2.0)),
+	    	int(math.Floor(float64(size.Max.X) / 2.0) + (float64(txtSize.X) / 2.0)),
+	    	int(math.Floor(float64(size.Max.Y) / 2.0) + (float64(txtSize.Y) / 2.0)),
+	    )
+
+	    draw.Draw(dst, txtBounds, txtImage, image.ZP, draw.Src)
+    }
 
 	if format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
-		jpeg.Encode(w, dst, &jpeg.Options{jpeg.DefaultQuality})
+		jpeg.Encode(w, dst, &jpeg.Options{100})
 		return
 	}
 	if format == "png" {
@@ -338,8 +389,8 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	if format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
-		jpeg.Encode(w, dst, &jpeg.Options{jpeg.DefaultQuality})
-		jpeg.Encode(outputWriter, dst, &jpeg.Options{jpeg.DefaultQuality})
+		jpeg.Encode(w, dst, &jpeg.Options{90})
+		jpeg.Encode(outputWriter, dst, &jpeg.Options{90})
 		return
 	}
 	if format == "png" {
