@@ -17,6 +17,10 @@ import (
 	"strconv"
 	"strings"
 	"log"
+	"os/exec"
+	"path/filepath"
+	"io"
+	"bytes"
 
 	"github.com/disintegration/imaging"
 	"code.google.com/p/freetype-go/freetype"
@@ -31,7 +35,7 @@ var (
 )
 
 var imageRoot, adminListen, publicListen, publicAddress string  // Global config variables
-var debug bool
+var debug, imgmin bool
 var ratios []image.Point
 
 var nextId = -1
@@ -39,8 +43,15 @@ var nextId = -1
 func loadConfig() {
 
 	if _, err := os.Stat(*configPath); err != nil {
-		fmt.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
+		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
 		os.Exit(1)
+	}
+
+	_, err := exec.LookPath("imgmin")
+	if err != nil {
+		log.Println("Couldn't find imgmin in the $PATH, compression won't be as effective.")
+	} else {
+		imgmin = true
 	}
 
 
@@ -94,7 +105,6 @@ func ratioPointToString(imageRatio image.Point) string {
 }
 
 
-// TODO: Should imageRatio really be a string?
 func getSelection(imageId string, imageSize image.Point, imageRatio string) image.Rectangle {
 
     var selectionJsonPath = imageRoot + "/" + imageId + "/selections.json"
@@ -104,14 +114,14 @@ func getSelection(imageId string, imageSize image.Point, imageRatio string) imag
         json.Unmarshal(selectionBytes, &selections)
     } else {
         // TODO: Make dynamic based on the number of ratios
-        selections = make(map[string]image.Rectangle, 5)
+        selections = make(map[string]image.Rectangle, len(ratios))
     }
     // TODO: maybe pss the string into this?
     if selection, ok := selections[imageRatio]; ok {
         return selection
     }
 
-    src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
+    src, err := imaging.Open(filepath.Join(imageRoot, imageId, "src"))
     if err != nil {
         fmt.Println("Couldn't find an image. Did you set the image root?")
     }
@@ -165,7 +175,6 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
 	var selections = make([]image.Rectangle, len(ratios))
 
-    // TODO: get selection from disk
 	for i, ratio := range ratios {
         var imageRatio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
 		selections[i] = getSelection(imageId, src.Bounds().Max, imageRatio)
@@ -270,11 +279,11 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func placeholder(w http.ResponseWriter, imageRatio string, width int, format string) {
+func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 	// TODO: Don't do so much stupid shit with this font stuff.
 
-	var ratio = ratioStringToPoint(imageRatio)
-	var size = image.Rect(0, 0, width, int(math.Floor(float64(width) * float64(ratio.Y) / float64(ratio.X))))
+	var ratio = ratioStringToPoint(imageReq.ratio)
+	var size = image.Rect(0, 0, imageReq.width, int(math.Floor(float64(imageReq.width) * float64(ratio.Y) / float64(ratio.X))))
 	var dst = image.NewRGBA(size)
 	backgroundColor := color.RGBA{204, 204, 204, 255}
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
@@ -291,7 +300,7 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
 
     darkGrey := image.NewUniform(color.RGBA{150, 150, 150, 255})
 
-    var fontSize = float64(width) * 52 / 300  // Stupid magic number
+    var fontSize = float64(imageReq.width) * 52 / 300  // Stupid magic number
 
 	c := freetype.NewContext()
 	c.SetDPI(72)
@@ -304,7 +313,7 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
 	var offsetFix = int(math.Floor(fontSize * 12 / 72))  // Stupid magic number
 
 	pt := freetype.Pt(0, int(c.PointToFix32(fontSize) >> 8) - offsetFix)
-	pt, err = c.DrawString(imageRatio, pt)
+	pt, err = c.DrawString(imageReq.ratio, pt)
     if err != nil {
         log.Println(err)
         return
@@ -322,12 +331,12 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
     draw.Draw(dst, txtBounds, txtImage, image.ZP, draw.Src)
 
 
-	if format == "jpg" {
+	if imageReq.format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
-		jpeg.Encode(w, dst, &jpeg.Options{100})
+		jpeg.Encode(w, dst, &jpeg.Options{90})
 		return
 	}
-	if format == "png" {
+	if imageReq.format == "png" {
 		w.Header().Set("Content-Type", "image/png")
 		png.Encode(w, dst)
 		return
@@ -335,62 +344,121 @@ func placeholder(w http.ResponseWriter, imageRatio string, width int, format str
 
 }
 
+type ImageRequest struct {
+	id string
+	ratio string
+	width int
+	format string
+	dir string
+	path string
+}
+
+func cp(src, dst string) error {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	// no need to check errors on read only file, we already got everything
+	// we need from the filesystem, so nothing can go wrong now.
+	defer s.Close()
+	d, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(d, s); err != nil {
+		d.Close()
+		return err
+	}
+	return d.Close()
+}
+
+func minify(src, dst string) {
+	cmd := exec.Command("imgmin", src, dst)
+	var out bytes.Buffer
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Println(err)
+		log.Println(out.String())
+
+		err = cp(src, dst)
+		if err == nil {
+			log.Println(err)
+			return
+		}
+	}
+	os.Remove(src)
+}
 
 func crop(w http.ResponseWriter, r *http.Request) {
 
-	var path_segments = strings.Split(r.URL.Path, "/")
-	if len(path_segments) != 4 {
+	match, err := filepath.Match("/*/*x*/*.???", r.URL.Path)
+	if !match {
 		http.Error(w, "Couldn't find that.", 404)
 		return
 	}
 
-	var image_id = path_segments[1]
-	var imageRatio = path_segments[2]
-	var filename = path_segments[3]
+	width, _ := strconv.Atoi(strings.Split(filepath.Base(r.URL.Path), ".")[0])
+	imageReq := ImageRequest{
+		width: width,
+		format: strings.Split(filepath.Base(r.URL.Path), ".")[1],
+		ratio: strings.Split(filepath.Dir(r.URL.Path), "/")[2],
+		id: strings.Split(filepath.Dir(r.URL.Path), "/")[1],
+		dir: filepath.Join(imageRoot, filepath.Dir(r.URL.Path)),
+		path: r.URL.Path,
+	}
 
 
-    width, _ := strconv.Atoi(strings.Split(filename, ".")[0])
-	if width > 9000 {
+	if imageReq.width > 9000 {
 		http.Error(w, "Enhance your calm, bro.", 420)
 		return
 	}
 
-	var format = strings.Split(filename, ".")[1]
-
-    _, err := imaging.Open(imageRoot + "/" + image_id + "/src")
-	if err != nil {
+	_, err = os.Stat(filepath.Join(imageRoot, imageReq.id, "src"))
+    if err != nil { 
     	if debug {
-    		placeholder(w, imageRatio, width, format)
+    		placeholder(w, imageReq)
     		return
-
-    		
     	} else {
     		http.Error(w, "Couldn't find that.", 404)
     		return
     	}
-    }
+   	}
 
-	var dst = imageCrop(image_id, imageRatio)
-	dst = imaging.Resize(dst, int(width), 0, imaging.CatmullRom)
+	var dst = imageCrop(imageReq.id, imageReq.ratio)
+	dst = imaging.Resize(dst, imageReq.width, 0, imaging.CatmullRom)
 
-	_ = os.MkdirAll(imageRoot+"/"+image_id+"/"+imageRatio, 0700)
-	outputWriter, _ := os.Create(imageRoot + r.URL.Path)
-
-	if format == "jpg" {
-		w.Header().Set("Content-Type", "image/jpeg")
-		jpeg.Encode(w, dst, &jpeg.Options{90})
-		jpeg.Encode(outputWriter, dst, &jpeg.Options{90})
-		return
+	err = os.MkdirAll(imageReq.dir, 0700)
+	if err != nil {
+		log.Print(imageReq.dir)
+		log.Println(err)
 	}
-	if format == "png" {
+
+	croppedPath := filepath.Join(imageRoot, imageReq.path)
+	if imgmin {
+		croppedPath = croppedPath + ".preopt"
+	}
+
+	outputWriter, _ := os.Create(croppedPath)
+
+	if imageReq.format == "jpg" {
+		w.Header().Set("Content-Type", "image/jpeg")
+		jpeg.Encode(w, dst, &jpeg.Options{75})
+		if imgmin {
+			jpeg.Encode(outputWriter, dst, &jpeg.Options{100})
+		} else {
+			jpeg.Encode(outputWriter, dst, &jpeg.Options{75})
+		}
+	}
+	if imageReq.format == "png" {
 		w.Header().Set("Content-Type", "image/png")
 		png.Encode(w, dst)
 		png.Encode(outputWriter, dst)
-		return
 	}
 
-	http.Error(w, "Couldn't find that.", 404)
-	return
+	if imgmin {
+		go minify(croppedPath, filepath.Join(imageRoot, imageReq.path))
+	}
 }
 
 func js(w http.ResponseWriter, r *http.Request) {
@@ -453,12 +521,10 @@ func main() {
 
 	adminServeMux.HandleFunc("/cropper/js/", js)
 	adminServeMux.HandleFunc("/cropper/css/", css)
-
 	adminServeMux.HandleFunc("/cropper/", cropper)
-
-
 	adminServeMux.HandleFunc("/api/new", newImage)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
+	log.Print("Ready to crop!")
 	
 }
