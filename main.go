@@ -399,7 +399,7 @@ func minify(src, dst string) {
 
 func crop(w http.ResponseWriter, r *http.Request) {
 
-	match, err := filepath.Match("/*/*x*/*.???", r.URL.Path)
+	match, err := filepath.Match("/*/*/*.???", r.URL.Path)
 	if !match {
 		http.Error(w, "Couldn't find that.", 404)
 		return
