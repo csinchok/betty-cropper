@@ -270,7 +270,11 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	var image_id = nextId
 	nextId += 1
 
-	_ = os.MkdirAll(imageRoot + "/" + strconv.Itoa(image_id), 0700)
+	err = os.MkdirAll(imageRoot + "/" + strconv.Itoa(image_id), 0700)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	err = ioutil.WriteFile(imageRoot + "/" + strconv.Itoa(image_id) + "/src", data, 0777)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
