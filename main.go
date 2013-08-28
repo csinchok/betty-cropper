@@ -32,13 +32,15 @@ import (
 
 var (
 	configPath = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
+	imageRoot = ""
+	adminListen = ":9999"
+	publicListen = ":8888"
+	publicAddress = "localhost:8888"
+	debug = false
+	imgmin = false
+	ratios []image.Point
+	nextId = -1
 )
-
-var imageRoot, adminListen, publicListen, publicAddress string  // Global config variables
-var debug, imgmin bool
-var ratios []image.Point
-
-var nextId = -1
 
 func loadConfig() {
 
@@ -103,7 +105,6 @@ func ratioStringToPoint(imageRatio string) image.Point {
 func ratioPointToString(imageRatio image.Point) string {
 	return ""
 }
-
 
 func getSelection(imageId string, imageSize image.Point, imageRatio string) image.Rectangle {
 
@@ -263,6 +264,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		http.Error(w, "File error", 500)
+		return
 	}
 
 	var image_id = nextId
@@ -271,7 +273,8 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	_ = os.MkdirAll(imageRoot + "/" + strconv.Itoa(image_id), 0700)
 	err = ioutil.WriteFile(imageRoot + "/" + strconv.Itoa(image_id) + "/src", data, 0777)
 	if err != nil {
-		http.Error(w, "IO error", 500)
+		http.Error(w, err.Error(), 500)
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
@@ -516,6 +519,7 @@ func main() {
 
 	publicServeMux.HandleFunc("/", crop)
 	go func() {
+		log.Print("Ready to crop!")
 		publicServer.ListenAndServe()
 	}()
 
@@ -525,6 +529,5 @@ func main() {
 	adminServeMux.HandleFunc("/api/new", newImage)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
-	log.Print("Ready to crop!")
 	
 }
