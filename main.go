@@ -197,6 +197,55 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 	// t.Execute(w, Cropper{ImageId: image_id, Ratios: &ratios})
 }
 
+	type SearchResult struct {
+		ImageId     int
+		Name   string
+	}
+
+func search(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "GET only, you asshole.", 405)
+		return
+	}
+	
+	if query, ok := r.URL.Query()["q"]; ok {
+		cmd := exec.Command("find", imageRoot, "-iname", "*" + query[0] + "*")
+		var out bytes.Buffer
+		cmd.Stdout= &out
+		err := cmd.Run()
+		if err != nil {
+			log.Print(err)
+		} else {
+			var lines = strings.Split(out.String(), "\n")
+			var results []SearchResult = make([]SearchResult, len(lines) - 1)
+
+			for index, line := range strings.Split(out.String(), "\n") {
+				dir, file := filepath.Split(line)
+				var imageId = filepath.Base(dir)
+				var name = filepath.Base(file)
+				if imageId !=  "." && name != "." {
+					imageId, _ := strconv.Atoi(imageId)
+					results[index] = SearchResult{
+						ImageId: imageId,
+						Name: name,
+					}
+				}
+			}
+			b, err := json.Marshal(results)
+			if err != nil {
+				fmt.Println("error:", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			w.Write(b)
+			return
+		}
+	} else {
+		http.Error(w, "GET only, you asshole.", 400)
+		return
+	}
+}
+
 func api(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "POST only, you asshole.", 405)
@@ -254,14 +303,19 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "POST only, you asshole.", 405)
 		return
 	}
-	file, _, err := r.FormFile("image")
+	file, fileHeader, err := r.FormFile("image")
 	// TODO: check to make sure it's a valid image
 	if err != nil {
 		http.Error(w, "POST error", 500)
 		return
 	}
+	
+	var filename = fileHeader.Filename;
+	if(r.FormValue("name") != "") {
+		filename = r.FormValue("name") + filepath.Ext(filename)
+	}
 
-	data, err := ioutil.ReadAll(file)
+	srcData, err := ioutil.ReadAll(file)
 	if err != nil {
 		http.Error(w, "File error", 500)
 		return
@@ -275,11 +329,21 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	err = ioutil.WriteFile(imageRoot + "/" + strconv.Itoa(image_id) + "/src", data, 0777)
+
+	var srcPath = filepath.Join(imageRoot, strconv.Itoa(image_id), filename)
+	var srcLinkPath = filepath.Join(imageRoot, strconv.Itoa(image_id), "src")
+
+	err = ioutil.WriteFile(srcPath, srcData, 0777)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	err = os.Link(srcPath, srcLinkPath)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
 	fmt.Fprintf(w, "{\"id\":%d}", image_id)
@@ -500,7 +564,10 @@ func main() {
 
     loadConfig()
 
-	fileList, _ := ioutil.ReadDir(imageRoot)
+	fileList, err := ioutil.ReadDir(imageRoot)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if len(fileList) == 0 {
 		nextId = 1
 	} else {
@@ -531,7 +598,7 @@ func main() {
 	adminServeMux.HandleFunc("/cropper/css/", css)
 	adminServeMux.HandleFunc("/cropper/", cropper)
 	adminServeMux.HandleFunc("/api/new", newImage)
+	adminServeMux.HandleFunc("/api/search", search)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
-	
 }
