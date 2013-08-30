@@ -26,11 +26,14 @@ import (
 	"github.com/disintegration/imaging"
 )
 
+var BETTY_VERSION = "1.1.2"
+
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
 // Admin interface on a different ip
 
 var (
+	version       = flag.Bool("version", false, "Print the version number and exit")
 	configPath    = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
 	imageRoot     = ""
 	adminListen   = ":9999"
@@ -43,6 +46,11 @@ var (
 )
 
 func loadConfig() {
+
+	if *version {
+		fmt.Printf(BETTY_VERSION)
+		os.Exit(0)
+	}
 
 	if _, err := os.Stat(*configPath); err != nil {
 		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
