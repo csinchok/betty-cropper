@@ -27,7 +27,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.7"
+var BETTY_VERSION = "1.1.8"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -614,6 +614,10 @@ func main() {
 			srcFile := filepath.Join(imageRoot, dir.Name(), "src")
 			dest, err := os.Readlink(srcFile)
 			if err == nil {
+				id, err := strconv.Atoi(dir.Name())
+				if err == nil && id > nextId {
+					nextId = id + 1
+				}
 				data := SearchResult{
 					Name:    dest,
 					ImageId: dir.Name(),
