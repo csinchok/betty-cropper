@@ -27,7 +27,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.6"
+var BETTY_VERSION = "1.1.7"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -225,33 +225,33 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if query, ok := r.URL.Query()["q"]; ok {
-		ids, _ := SearchEngine.Query(query[0], 25)
-		var results []SearchResult = make([]SearchResult, len(ids))
-		for index, id := range ids {
-			srcFile := filepath.Join(imageRoot, id, "src")
-			dest, err := os.Readlink(srcFile)
-			if err == nil {
-				results[index] = SearchResult{
-					ImageId: id,
-					Name: filepath.Base(dest),
-				}
+	queryList, ok := r.URL.Query()["q"]
+	var query = ""
+	if ok {
+		query = queryList[0]
+	}
+
+	ids, _ := SearchEngine.Query(query, 25)
+	var results []SearchResult = make([]SearchResult, len(ids))
+	for index, id := range ids {
+		srcFile := filepath.Join(imageRoot, id, "src")
+		dest, err := os.Readlink(srcFile)
+		if err == nil {
+			results[index] = SearchResult{
+				ImageId: id,
+				Name: filepath.Base(dest),
 			}
 		}
-
-		b, err := json.Marshal(results)
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write(b)
-		return
-
-	} else {
-		http.Error(w, "GET only, you asshole.", 400)
-		return
 	}
+
+	b, err := json.Marshal(results)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(b)
+	return
 }
 
 func api(w http.ResponseWriter, r *http.Request) {
@@ -370,7 +370,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprintf(w, "{\"id\":%d}", imageId)
+	fmt.Fprintf(w, "{\"id\":\"%s\"}", imageId)
 }
 
 var backgroundColors = []color.RGBA{
