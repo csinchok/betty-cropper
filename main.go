@@ -26,7 +26,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.3"
+var BETTY_VERSION = "1.1.4"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -306,6 +306,13 @@ func api(w http.ResponseWriter, r *http.Request) {
 }
 
 func newImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.WriteHeader(200)
+		return
+	}
+
 	if r.Method != "POST" {
 		http.Error(w, "POST only, you asshole.", 405)
 		return
