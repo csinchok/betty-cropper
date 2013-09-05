@@ -211,6 +211,15 @@ type SearchResult struct {
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(200)
+		fmt.Fprintln(w, 200)
+		return
+	}
+
 	if r.Method != "GET" {
 		http.Error(w, "GET only, you asshole.", 405)
 		return
@@ -302,19 +311,16 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 
 	if r.Method == "OPTIONS" {
-		log.Println("Got OPTIONS....")
 		w.WriteHeader(200)
 		fmt.Fprintln(w, 200)
 		return
 	}
 
 	if r.Method != "POST" {
-		log.Println("didn't get POST, got " + r.Method)
 		http.Error(w, "POST only, you asshole.", 405)
 		return
 	}
 
-	log.Println("Got POST....")
 	file, fileHeader, err := r.FormFile("image")
 	// TODO: check to make sure it's a valid image
 	if err != nil {
