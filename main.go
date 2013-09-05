@@ -26,7 +26,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.2"
+var BETTY_VERSION = "1.1.3"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
