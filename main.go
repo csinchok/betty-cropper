@@ -23,10 +23,11 @@ import (
 	"strings"
 
 	"code.google.com/p/freetype-go/freetype"
+	"github.com/argusdusty/Ferret"
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.5"
+var BETTY_VERSION = "1.1.6"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -205,7 +206,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 }
 
 type SearchResult struct {
-	ImageId int
+	ImageId string
 	Name    string
 }
 
@@ -216,37 +217,28 @@ func search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if query, ok := r.URL.Query()["q"]; ok {
-		cmd := exec.Command("find", imageRoot, "-iname", "*"+query[0]+"*")
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		err := cmd.Run()
-		if err != nil {
-			log.Print(err)
-		} else {
-			var lines = strings.Split(out.String(), "\n")
-			var results []SearchResult = make([]SearchResult, len(lines)-1)
-
-			for index, line := range strings.Split(out.String(), "\n") {
-				dir, file := filepath.Split(line)
-				var imageId = filepath.Base(dir)
-				var name = filepath.Base(file)
-				if imageId != "." && name != "." {
-					imageId, _ := strconv.Atoi(imageId)
-					results[index] = SearchResult{
-						ImageId: imageId,
-						Name:    name,
-					}
+		ids, _ := SearchEngine.Query(query[0], 25)
+		var results []SearchResult = make([]SearchResult, len(ids))
+		for index, id := range ids {
+			srcFile := filepath.Join(imageRoot, id, "src")
+			dest, err := os.Readlink(srcFile)
+			if err == nil {
+				results[index] = SearchResult{
+					ImageId: id,
+					Name: filepath.Base(dest),
 				}
 			}
-			b, err := json.Marshal(results)
-			if err != nil {
-				fmt.Println("error:", err)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(200)
-			w.Write(b)
-			return
 		}
+
+		b, err := json.Marshal(results)
+		if err != nil {
+			fmt.Println("error:", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write(b)
+		return
+
 	} else {
 		http.Error(w, "GET only, you asshole.", 400)
 		return
@@ -308,7 +300,7 @@ func api(w http.ResponseWriter, r *http.Request) {
 func newImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	
+
 	if r.Method == "OPTIONS" {
 		log.Println("Got OPTIONS....")
 		w.WriteHeader(200)
@@ -341,32 +333,38 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var image_id = nextId
+	var imageId = strconv.Itoa(nextId)
 	nextId += 1
 
-	err = os.MkdirAll(imageRoot+"/"+strconv.Itoa(image_id), 0700)
+	err = os.MkdirAll(filepath.Join(imageRoot, imageId), 0700)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	var srcPath = filepath.Join(imageRoot, strconv.Itoa(image_id), filename)
-	var srcLinkPath = filepath.Join(imageRoot, strconv.Itoa(image_id), "src")
+	var srcPath = filepath.Join(imageRoot, imageId, filename)
+	var srcLinkPath = filepath.Join(imageRoot, imageId, "src")
 
 	err = ioutil.WriteFile(srcPath, srcData, 0777)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	err = os.Link(srcPath, srcLinkPath)
+	err = os.Symlink(srcPath, srcLinkPath)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
+	data := SearchResult{
+		Name:    filename,
+		ImageId: imageId,
+	}
+	SearchEngine.Insert(filename, imageId, data)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprintf(w, "{\"id\":%d}", image_id)
+	fmt.Fprintf(w, "{\"id\":%d}", imageId)
 }
 
 var backgroundColors = []color.RGBA{
@@ -590,19 +588,35 @@ func css(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Couldn't find that.", 404)
 }
 
+var SearchEngine = ferret.New(make([]string, 0), make([]string, 0), make([]interface{}, 0), ferret.UnicodeToLowerASCII)
+
 func main() {
 	flag.Parse()
 
 	loadConfig()
 
-	fileList, err := ioutil.ReadDir(imageRoot)
+	dirList, err := ioutil.ReadDir(imageRoot)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if len(fileList) == 0 {
+	if len(dirList) == 0 {
 		nextId = 1
 	} else {
-		var lastDirectory = fileList[len(fileList)-1]
+		// names := make([]string, 0)
+		// ids := make([]string, 0)
+		for _, dir := range dirList {
+			srcFile := filepath.Join(imageRoot, dir.Name(), "src")
+			dest, err := os.Readlink(srcFile)
+			if err == nil {
+				data := SearchResult{
+					Name:    dest,
+					ImageId: dir.Name(),
+				}
+				SearchEngine.Insert(filepath.Base(dest), dir.Name(), data)
+			}
+		}
+
+		var lastDirectory = dirList[len(dirList)-1]
 		lastId, _ := strconv.Atoi(lastDirectory.Name())
 		nextId = lastId + 1
 	}
