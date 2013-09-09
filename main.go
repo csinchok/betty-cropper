@@ -27,7 +27,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.9"
+var BETTY_VERSION = "1.1.10"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -622,9 +622,13 @@ func main() {
 			srcFile := filepath.Join(imageRoot, dir.Name(), "src")
 			dest, err := os.Readlink(srcFile)
 			if err == nil {
-				id, err := strconv.Atoi(dir.Name())
-				if err == nil && id > nextId {
-					nextId = id + 1
+				imageId, err := strconv.Atoi(dir.Name())
+				if err == nil {
+					if imageId > nextId {
+						nextId = imageId + 1
+					}
+				} else {
+					log.Println(err.Error())
 				}
 				data := SearchResult{
 					Name:    dest,
@@ -633,10 +637,6 @@ func main() {
 				SearchEngine.Insert(filepath.Base(dest), dir.Name(), data)
 			}
 		}
-
-		var lastDirectory = dirList[len(dirList)-1]
-		lastId, _ := strconv.Atoi(lastDirectory.Name())
-		nextId = lastId + 1
 	}
 
 	var adminServeMux = http.NewServeMux()
