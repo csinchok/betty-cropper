@@ -44,6 +44,7 @@ var (
 	imgmin        = false
 	ratios        []image.Point
 	nextId        = -1
+	adminReady    = false
 )
 
 func loadConfig() {
@@ -624,7 +625,7 @@ func main() {
 			if err == nil {
 				imageId, err := strconv.Atoi(dir.Name())
 				if err == nil {
-					if imageId > nextId {
+					if imageId >= nextId {
 						nextId = imageId + 1
 					}
 				} else {
@@ -664,4 +665,5 @@ func main() {
 	adminServeMux.HandleFunc("/api/search", search)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
+	adminReady = true
 }
