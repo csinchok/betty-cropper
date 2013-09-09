@@ -27,7 +27,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.10"
+var BETTY_VERSION = "1.1.11"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -351,7 +351,7 @@ func newImage(w http.ResponseWriter, r *http.Request) {
 	var imageId = strconv.Itoa(nextId)
 	nextId += 1
 
-	err = os.MkdirAll(filepath.Join(imageRoot, imageId), 0700)
+	err = os.MkdirAll(filepath.Join(imageRoot, imageId), 0644)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -543,7 +543,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	var dst = imageCrop(imageReq.id, imageReq.ratio)
 	dst = imaging.Resize(dst, imageReq.width, 0, imaging.CatmullRom)
 
-	err = os.MkdirAll(imageReq.dir, 0700)
+	err = os.MkdirAll(imageReq.dir, 0644)
 	if err != nil {
 		log.Print(imageReq.dir)
 		log.Println(err)
