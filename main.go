@@ -27,7 +27,7 @@ import (
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.8"
+var BETTY_VERSION = "1.1.9"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -108,10 +108,6 @@ func ratioStringToPoint(imageRatio string) image.Point {
 	var w, _ = strconv.Atoi(strings.Split(imageRatio, "x")[0])
 	var h, _ = strconv.Atoi(strings.Split(imageRatio, "x")[1])
 	return image.Point{w, h}
-}
-
-func ratioPointToString(imageRatio image.Point) string {
-	return ""
 }
 
 func getSelection(imageId string, imageSize image.Point, imageRatio string) image.Rectangle {
@@ -213,6 +209,7 @@ type SearchResult struct {
 func search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
 	
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(200)
@@ -255,6 +252,16 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func api(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(200)
+		fmt.Fprintln(w, 200)
+		return
+	}
+
 	if r.Method != "POST" {
 		http.Error(w, "POST only, you asshole.", 405)
 		return
@@ -309,6 +316,7 @@ func api(w http.ResponseWriter, r *http.Request) {
 func newImage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(200)
