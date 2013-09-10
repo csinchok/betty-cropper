@@ -411,7 +411,7 @@ func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 	var backgroundColor = backgroundColors[backgroundIndex%len(backgroundColors)]
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
 
-	font, err := freetype.ParseFont(font_kunkhmer_ttf())
+	font, err := freetype.ParseFont(font_ttf())
 	if err != nil {
 		log.Println(err)
 		return
