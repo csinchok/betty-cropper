@@ -35,7 +35,7 @@ var BETTY_VERSION = "1.1.11"
 
 var (
 	version       = flag.Bool("version", false, "Print the version number and exit")
-	configPath    = flag.String("config", "/etc/betty-cropper/config.json", "Path for the config file")
+	configPath    = flag.String("config", "config.json", "Path for the config file")
 	imageRoot     = ""
 	adminListen   = ":9999"
 	publicListen  = ":8888"
@@ -54,12 +54,17 @@ func loadConfig() {
 		os.Exit(0)
 	}
 
-	if _, err := os.Stat(*configPath); err != nil {
+	absConfigPath, err := filepath.Abs(*configPath)
+	if err != nil {
+		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
+		os.Exit(1)
+	}
+	if _, err = os.Stat(absConfigPath); err != nil {
 		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
 		os.Exit(1)
 	}
 
-	_, err := exec.LookPath("imgmin")
+	_, err = exec.LookPath("imgmin")
 	if err != nil {
 		log.Println("Couldn't find imgmin in the $PATH, compression won't be as effective.")
 	} else {
@@ -189,7 +194,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
 
 	t := template.New("cropper.html")
-	t.Parse(string(cropper_html()))
+	t.Parse(string(html_cropper_html()))
 	t.Execute(w, map[string]interface{}{
 		"ImageId":       imageId,
 		"Ratios":        ratios,
@@ -406,7 +411,7 @@ func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 	var backgroundColor = backgroundColors[backgroundIndex%len(backgroundColors)]
 	draw.Draw(dst, dst.Bounds(), &image.Uniform{backgroundColor}, image.ZP, draw.Src)
 
-	font, err := freetype.ParseFont(lucida_font())
+	font, err := freetype.ParseFont(font_kunkhmer_ttf())
 	if err != nil {
 		log.Println(err)
 		return
@@ -579,12 +584,12 @@ func crop(w http.ResponseWriter, r *http.Request) {
 func js(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/cropper/js/jquery.color.js" {
 		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(jquery_color_js())
+		w.Write(js_jquery_color_js())
 		return
 	}
 	if r.URL.Path == "/cropper/js/jquery.Jcrop.min.js" {
 		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(jquery_jcrop_js())
+		w.Write(js_jquery_jcrop_min_js())
 		return
 	}
 }
@@ -592,12 +597,12 @@ func js(w http.ResponseWriter, r *http.Request) {
 func css(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/cropper/css/Jcrop.gif" {
 		w.Header().Set("Content-Type", "image/gif")
-		w.Write(jcrop_gif())
+		w.Write(css_jcrop_gif())
 		return
 	}
 	if r.URL.Path == "/cropper/css/jquery.Jcrop.min.css" {
 		w.Header().Set("Content-Type", "text/css")
-		w.Write(jcrop_css())
+		w.Write(css_jquery_jcrop_min_css())
 		return
 	}
 	http.Error(w, "Couldn't find that.", 404)
