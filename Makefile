@@ -11,12 +11,12 @@ reqs:
 
 bindata:
 	@echo "\x1b[31;1mConverting static resources to golang...\x1b[0m"
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_kunkhmer_ttf.go" font/KunKhmer.ttf
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jcrop_gif.go" css/JCrop.gif
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_jcrop_min_css.go" css/jquery.Jcrop.min.css
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_color_js.go" js/jquery.color.js
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_jcrop_min_js.go" js/jquery.Jcrop.min.js
-	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_cropper_html.go" html/cropper.html
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_kunkhmer_ttf.go" --func=font_kunkhmer_ttf font/KunKhmer.ttf
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jcrop_gif.go" --func=css_jcrop_gif css/JCrop.gif
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_jcrop_min_css.go" --func=css_jquery_jcrop_min_css css/jquery.Jcrop.min.css
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_color_js.go" --func=js_jquery_color_js js/jquery.color.js
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_jquery_jcrop_min_js.go" --func=js_jquery_jcrop_min_js js/jquery.Jcrop.min.js
+	$(GOPATH)/bin/go-bindata --out="$(GOPATH)/bindata_cropper_html.go" --func=html_cropper_html html/cropper.html
 
 build:
 	@echo "\x1b[31;1mBuilding...\x1b[0m"
