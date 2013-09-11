@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"image"
 	"image/color"
 	"image/draw"
@@ -23,11 +22,10 @@ import (
 	"strings"
 
 	"code.google.com/p/freetype-go/freetype"
-	"github.com/argusdusty/Ferret"
 	"github.com/disintegration/imaging"
 )
 
-var BETTY_VERSION = "1.1.14"
+var BETTY_VERSION = "1.1.15"
 
 // TODOs: Shouldn't be opening the image file more than once.
 // Memcached integration
@@ -36,7 +34,7 @@ var BETTY_VERSION = "1.1.14"
 var (
 	version       = flag.Bool("version", false, "Print the version number and exit")
 	configPath    = flag.String("config", "config.json", "Path for the config file")
-	imageRoot     = ""
+	imageRoot     = "/var/betty-cropper"
 	adminListen   = ":9999"
 	publicListen  = ":8888"
 	publicAddress = "localhost:8888"
@@ -82,32 +80,24 @@ func loadConfig() {
 	}
 
 	var config Config
-	if configPath != nil {
-		configBytes, err := ioutil.ReadFile(*configPath)
-		if err == nil {
-			json.Unmarshal(configBytes, &config)
-			adminListen = config.AdminListen
-			publicListen = config.PublicListen
-			publicAddress = config.PublicAddress
-			imageRoot = config.ImageRoot
+	configBytes, err := ioutil.ReadFile(*configPath)
+	if err == nil {
+		json.Unmarshal(configBytes, &config)
+		adminListen = config.AdminListen
+		publicListen = config.PublicListen
+		publicAddress = config.PublicAddress
+		imageRoot = config.ImageRoot
 
-			debug = config.Debug
+		debug = config.Debug
 
-			ratios = make([]image.Point, len(config.Ratios))
-			// ratios = [config.Ratios.len()]image.Point
-			for index, ratio := range config.Ratios {
-				var w, _ = strconv.Atoi(strings.Split(ratio, "x")[0])
-				var h, _ = strconv.Atoi(strings.Split(ratio, "x")[1])
-				ratios[index] = image.Pt(w, h)
-			}
-			return
+		ratios = make([]image.Point, len(config.Ratios))
+		// ratios = [config.Ratios.len()]image.Point
+		for index, ratio := range config.Ratios {
+			var w, _ = strconv.Atoi(strings.Split(ratio, "x")[0])
+			var h, _ = strconv.Atoi(strings.Split(ratio, "x")[1])
+			ratios[index] = image.Pt(w, h)
 		}
 	}
-	adminListen = ":9999"
-	publicListen = ":8888"
-	publicAddress = "http://localhost:8888"
-	imageRoot = "/var/betty-cropper"
-
 }
 
 func ratioStringToPoint(imageRatio string) image.Point {
@@ -172,219 +162,6 @@ func imageCrop(imageId string, imageRatio string) image.Image {
 	var selection = getSelection(imageId, src.Bounds().Max, imageRatio)
 
 	return imaging.Crop(src, selection)
-}
-
-func cropper(w http.ResponseWriter, r *http.Request) {
-	var imageId = strings.Split(r.URL.Path, "/")[2]
-
-	src, err := imaging.Open(imageRoot + "/" + imageId + "/src")
-	var imageScale = 600.0 / float64(src.Bounds().Max.X)
-
-	if err != nil {
-		fmt.Println("Couldn't find an image. Did you set the image root?")
-	}
-
-	var selections = make([]image.Rectangle, len(ratios))
-
-	for i, ratio := range ratios {
-		var imageRatio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
-		selections[i] = getSelection(imageId, src.Bounds().Max, imageRatio)
-	}
-
-	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
-
-	t := template.New("cropper.html")
-	t.Parse(string(html_cropper_html()))
-	t.Execute(w, map[string]interface{}{
-		"ImageId":       imageId,
-		"Ratios":        ratios,
-		"Selections":    selections,
-		"ScaledSize":    scaled_size,
-		"ImageScale":    imageScale,
-		"PublicAddress": publicAddress,
-	})
-
-	// t.Execute(w, Cropper{ImageId: image_id, Ratios: &ratios})
-}
-
-type SearchResult struct {
-	ImageId string
-	Name    string
-}
-
-func search(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
-	
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(200)
-		fmt.Fprintln(w, 200)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "GET only, you asshole.", 405)
-		return
-	}
-
-	queryList, ok := r.URL.Query()["q"]
-	var query = ""
-	if ok {
-		query = queryList[0]
-	}
-
-	ids, _ := SearchEngine.Query(query, 25)
-	var results []SearchResult = make([]SearchResult, len(ids))
-	for index, id := range ids {
-		srcFile := filepath.Join(imageRoot, id, "src")
-		dest, err := os.Readlink(srcFile)
-		if err == nil {
-			results[index] = SearchResult{
-				ImageId: id,
-				Name: filepath.Base(dest),
-			}
-		}
-	}
-
-	b, err := json.Marshal(results)
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	w.Write(b)
-	return
-}
-
-func api(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(200)
-		fmt.Fprintln(w, 200)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "POST only, you asshole.", 405)
-		return
-	}
-
-	var pathSegments = strings.Split(r.URL.Path, "/")
-	var imageId = pathSegments[2]
-	var imageRatio = pathSegments[3]
-
-	minX, err := strconv.Atoi(r.FormValue("minX"))
-	if err != nil {
-		fmt.Println(err)
-	}
-	minY, err := strconv.Atoi(r.FormValue("minY"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	maxX, err := strconv.Atoi(r.FormValue("maxX"))
-	if err != nil {
-		fmt.Println(err)
-	}
-	maxY, err := strconv.Atoi(r.FormValue("maxY"))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	var selections map[string]image.Rectangle
-
-	var selection_json_path = imageRoot + "/" + imageId + "/selections.json"
-
-	selection_bytes, err := ioutil.ReadFile(selection_json_path)
-	if err == nil {
-		json.Unmarshal(selection_bytes, &selections)
-	} else {
-		// TODO: Make dynamic based on the number of ratios
-		selections = make(map[string]image.Rectangle, 5)
-	}
-
-	// TODO: validate image ratio
-	selections[imageRatio] = image.Rectangle{
-		image.Point{minX, minY},
-		image.Point{maxX, maxY},
-	}
-
-	data, err := json.Marshal(selections)
-	err = ioutil.WriteFile(selection_json_path, data, 0777)
-
-	fmt.Fprintf(w, "Updated sucessfully")
-}
-
-func newImage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(200)
-		fmt.Fprintln(w, 200)
-		return
-	}
-
-	if r.Method != "POST" {
-		http.Error(w, "POST only, you asshole.", 405)
-		return
-	}
-
-	file, fileHeader, err := r.FormFile("image")
-	// TODO: check to make sure it's a valid image
-	if err != nil {
-		http.Error(w, "POST error", 500)
-		return
-	}
-
-	var filename = fileHeader.Filename
-	if r.FormValue("name") != "" {
-		filename = r.FormValue("name") + filepath.Ext(filename)
-	}
-
-	srcData, err := ioutil.ReadAll(file)
-	if err != nil {
-		http.Error(w, "File error", 500)
-		return
-	}
-
-	var imageId = strconv.Itoa(nextId)
-	nextId += 1
-
-	err = os.MkdirAll(filepath.Join(imageRoot, imageId), 0755)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	var srcPath = filepath.Join(imageRoot, imageId, filename)
-	var srcLinkPath = filepath.Join(imageRoot, imageId, "src")
-
-	err = ioutil.WriteFile(srcPath, srcData, 0777)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	err = os.Symlink(srcPath, srcLinkPath)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	data := SearchResult{
-		Name:    filename,
-		ImageId: imageId,
-	}
-	SearchEngine.Insert(filename, imageId, data)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	fmt.Fprintf(w, "{\"id\":\"%s\"}", imageId)
 }
 
 var backgroundColors = []color.RGBA{
@@ -581,69 +358,11 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func js(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/cropper/js/jquery.color.js" {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(js_jquery_color_js())
-		return
-	}
-	if r.URL.Path == "/cropper/js/jquery.Jcrop.min.js" {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(js_jquery_jcrop_min_js())
-		return
-	}
-}
-
-func css(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/cropper/css/Jcrop.gif" {
-		w.Header().Set("Content-Type", "image/gif")
-		w.Write(css_jcrop_gif())
-		return
-	}
-	if r.URL.Path == "/cropper/css/jquery.Jcrop.min.css" {
-		w.Header().Set("Content-Type", "text/css")
-		w.Write(css_jquery_jcrop_min_css())
-		return
-	}
-	http.Error(w, "Couldn't find that.", 404)
-}
-
-var SearchEngine = ferret.New(make([]string, 0), make([]string, 0), make([]interface{}, 0), ferret.UnicodeToLowerASCII)
-
 func main() {
 	flag.Parse()
 
 	loadConfig()
-
-	dirList, err := ioutil.ReadDir(imageRoot)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(dirList) == 0 {
-		nextId = 1
-	} else {
-		// names := make([]string, 0)
-		// ids := make([]string, 0)
-		for _, dir := range dirList {
-			srcFile := filepath.Join(imageRoot, dir.Name(), "src")
-			dest, err := os.Readlink(srcFile)
-			if err == nil {
-				imageId, err := strconv.Atoi(dir.Name())
-				if err == nil {
-					if imageId >= nextId {
-						nextId = imageId + 1
-					}
-				} else {
-					log.Println(err.Error())
-				}
-				data := SearchResult{
-					Name:    dest,
-					ImageId: dir.Name(),
-				}
-				SearchEngine.Insert(filepath.Base(dest), dir.Name(), data)
-			}
-		}
-	}
+	go buildIndex()
 
 	var adminServeMux = http.NewServeMux()
 	var adminServer = http.Server{
@@ -660,18 +379,17 @@ func main() {
 	publicServeMux.HandleFunc("/", crop)
 	go func() {
 		if debug {
-			log.Print("Ready to crop! (debug is enabled!)")
+			log.Print("Ready to crop! (debug enabled)")
 		} else {
 			log.Print("Ready to crop!")
 		}
-		
 		publicServer.ListenAndServe()
 	}()
 
 	adminServeMux.HandleFunc("/cropper/js/", js)
 	adminServeMux.HandleFunc("/cropper/css/", css)
 	adminServeMux.HandleFunc("/cropper/", cropper)
-	adminServeMux.HandleFunc("/api/new", newImage)
+	adminServeMux.HandleFunc("/api/new", new)
 	adminServeMux.HandleFunc("/api/search", search)
 	adminServeMux.HandleFunc("/api/", api)
 	adminServer.ListenAndServe()
