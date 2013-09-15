@@ -106,7 +106,7 @@ func TestBettyImage(t *testing.T) {
 	// Test with a short id
 	img, err := GetBettyImage("1")
 	if err != nil {
-		t.Errorf("Error getting image info: %s", err.Error)
+		t.Errorf("Error getting image info: %s", err.Error())
 	}
 	if img.Filename != "Lenna.png" {
 		t.Errorf("Filename should be 'Lenna.png', but we got '%s'", img.Filename)
