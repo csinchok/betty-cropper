@@ -15,13 +15,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-    "regexp"
+	"regexp"
 	"strconv"
 	"strings"
-    "time"
+	"time"
 
 	"github.com/disintegration/imaging"
-    "github.com/pmylund/go-cache"
+	"github.com/pmylund/go-cache"
 )
 
 var BETTY_VERSION = "1.1.15"
@@ -38,8 +38,8 @@ var (
 	ratios        []image.Point
 	nextId        = -1
 	adminReady    = false
-    c             = cache.New(15 * time.Minute, 30 * time.Second)
-    imageRegexp   = regexp.MustCompile(IMAGE_RE)
+	c             = cache.New(15*time.Minute, 30*time.Second)
+	imageRegexp   = regexp.MustCompile(IMAGE_RE)
 )
 
 func loadConfig() {
@@ -63,8 +63,8 @@ func loadConfig() {
 	}
 
 	type Config struct {
-		ImageRoot    string `json:"imageRoot"`    // Where we put out images
-		Listen  string `json:"listen"`  // The address that Betty listens on
+		ImageRoot     string   `json:"imageRoot"`     // Where we put out images
+		Listen        string   `json:"listen"`        // The address that Betty listens on
 		PublicAddress string   `json:"publicAddress"` // The address that the public interface is served from
 		Ratios        []string `json:"ratios"`        // A list of image ratios that we'll be cropping for
 		Debug         bool     `json:"debug"`         // If debug is true or false
@@ -73,9 +73,9 @@ func loadConfig() {
 	var config Config
 	configBytes, err := ioutil.ReadFile(absConfigPath)
 	if err != nil {
-        log.Printf("Can't read the config file, because \"%s\", exiting.\n", err)
-        os.Exit(1)
-    }
+		log.Printf("Can't read the config file, because \"%s\", exiting.\n", err)
+		os.Exit(1)
+	}
 	json.Unmarshal(configBytes, &config)
 	listen = config.Listen
 	publicAddress = config.PublicAddress
@@ -130,28 +130,28 @@ func minify(src, dst string) {
 }
 
 func crop(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "GET" {
-        http.Error(w, "GET only, you asshole.", 405)
-        return
-    }
+	if r.Method != "GET" {
+		http.Error(w, "GET only, you asshole.", 405)
+		return
+	}
 
-    imageReq, err := NewBettyRequest(r.URL.Path)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
+	imageReq, err := NewBettyRequest(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	if imageReq.Width > 3000 {
 		http.Error(w, "Couldn't find that.", 404)
 		return
 	}
 
-    if imageReq.Width < 1 {
-        http.Error(w, "Couldn't find that.", 404)
-        return
-    }
+	if imageReq.Width < 1 {
+		http.Error(w, "Couldn't find that.", 404)
+		return
+	}
 
-    img, err := imageReq.Image()
+	img, err := imageReq.Image()
 	if err != nil {
 		if debug {
 			placeholder(w, imageReq)
@@ -161,20 +161,20 @@ func crop(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-    var selection = img.Selection(imageReq.RatioString)
+	var selection = img.Selection(imageReq.RatioString)
 
-    src, err := imaging.Open(filepath.Join(imageRoot, imageReq.Id, "src"))
-    if err != nil {
-        http.Error(w, "Couldn't find that.", 404);
-        return
-    }
-    var dst = imaging.Crop(src, selection)
+	src, err := imaging.Open(filepath.Join(imageRoot, imageReq.Id, "src"))
+	if err != nil {
+		http.Error(w, "Couldn't find that.", 404)
+		return
+	}
+	var dst = imaging.Crop(src, selection)
 	dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
 
 	err = os.MkdirAll(filepath.Dir(imageReq.Path()), 0755)
 	if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
+		http.Error(w, err.Error(), 500)
+		return
 	}
 
 	croppedPath := imageReq.Path()
@@ -183,10 +183,10 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	outputWriter, err := os.Create(croppedPath)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	if imageReq.Format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
@@ -220,7 +220,7 @@ func main() {
 	http.HandleFunc("/api/new", new)
 	http.HandleFunc("/api/search", search)
 	http.HandleFunc("/api/", api)
-    http.HandleFunc("/", crop)
+	http.HandleFunc("/", crop)
 	http.ListenAndServe(listen, nil)
 	adminReady = true
 }

@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"log"
 	"os"
-	"strings"
 	"strconv"
-	"image"
+	"strings"
 
+	"encoding/json"
+	"html/template"
 	"io/ioutil"
 	"net/http"
-	"encoding/json"
 	"path/filepath"
-	"html/template"
 
 	"github.com/argusdusty/Ferret"
 	// "github.com/disintegration/imaging"
@@ -67,9 +67,9 @@ func buildIndex() {
 				filename := filepath.Base(dest)
 				imageName := strings.Replace(filename, filepath.Ext(filename), "", 1)
 				data := SearchResult{
-					Name:  expandImageName(imageName),
+					Name:    expandImageName(imageName),
 					ImageId: dir.Name(),
-					Credit: creditString,
+					Credit:  creditString,
 				}
 				SearchEngine.Insert(filepath.Base(dest), dir.Name(), data)
 			}
@@ -77,12 +77,11 @@ func buildIndex() {
 	}
 }
 
-
 func search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
-	
+
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(200)
 		fmt.Fprintln(w, "")
@@ -102,12 +101,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	ids, values := SearchEngine.Query(query, 25)
 	var results []SearchResult = make([]SearchResult, len(ids))
-	for index, id := range ids {		
+	for index, id := range ids {
 		data := values[index]
 		results[index] = SearchResult{
 			ImageId: id,
-			Name: data.(SearchResult).Name,
-			Credit: data.(SearchResult).Credit,
+			Name:    data.(SearchResult).Name,
+			Credit:  data.(SearchResult).Credit,
 		}
 	}
 
@@ -208,13 +207,11 @@ func api(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "")
 		}
 
-
 		if r.Method == "GET" {
 			srcPath := filepath.Join(imageRoot, imageId, "src")
 			originalPath, err := os.Readlink(srcPath)
 			filename := filepath.Base(originalPath)
 			name := strings.Replace(filename, filepath.Ext(filename), "", 1)
-			
 
 			var creditString string
 			creditPath := filepath.Join(imageRoot, imageId, "credit.txt")
@@ -225,8 +222,8 @@ func api(w http.ResponseWriter, r *http.Request) {
 
 			imageData := SearchResult{
 				ImageId: imageId,
-				Name: expandImageName(name),
-				Credit: creditString,
+				Name:    expandImageName(name),
+				Credit:  creditString,
 			}
 			data, err := json.Marshal(imageData)
 			w.WriteHeader(200)
@@ -275,7 +272,6 @@ func api(w http.ResponseWriter, r *http.Request) {
 			go buildIndex()
 			return
 		}
-
 
 		return
 	}
@@ -341,7 +337,7 @@ func new(w http.ResponseWriter, r *http.Request) {
 	data := SearchResult{
 		Name:    filename,
 		ImageId: imageId,
-		Credit: "",
+		Credit:  "",
 	}
 	SearchEngine.Insert(filename, imageId, data)
 
@@ -352,17 +348,17 @@ func new(w http.ResponseWriter, r *http.Request) {
 
 func cropper(w http.ResponseWriter, r *http.Request) {
 	var imageId = strings.Split(r.URL.Path, "/")[2]
-    img, err := GetBettyImage(imageId)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-    }
+	img, err := GetBettyImage(imageId)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	}
 
 	var imageScale = 600.0 / float64(img.Size.X)
 
 	var selections = make([]image.Rectangle, len(ratios))
 
 	for i, ratio := range ratios {
-        ratioString := fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
+		ratioString := fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
 		selections[i] = img.Selection(ratioString)
 	}
 
