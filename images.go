@@ -15,6 +15,10 @@ import (
 	"strings"
 )
 
+// The regex that validates and parses incoming image requests.
+var imageRegexp = regexp.MustCompile("^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>jpg|png)$")
+
+
 type BettyImage struct {
 	Id         string
 	Credit     string
@@ -87,15 +91,19 @@ func GetBettyImage(imageId string) (BettyImage, error) {
 	return img, nil
 }
 
+// Open the original image, and return a image.Image object.
 func (img BettyImage) Open() (image.Image, error) {
 	return imaging.Open(filepath.Join(GetImageDir(img.Id), "src"))
 }
 
+// Get a human readable name for the image, taken from the filename.
 func (img BettyImage) Name() string {
 	imageName := strings.Replace(img.Filename, filepath.Ext(img.Filename), "", 1)
 	return strings.Replace(imageName, "_", " ", -1)
 }
 
+// Given a ratio string, get the selection that we'll be cropping to, either
+// from the selections.json file, or just from the middle of the iamge.
 func (img BettyImage) Selection(ratioString string) image.Rectangle {
 	// If this selection is specified, just return it.
 	if selection, ok := img.Selections[ratioString]; ok {
@@ -132,6 +140,9 @@ func (img BettyImage) Selection(ratioString string) image.Rectangle {
 	return image.Rectangle{min, max}
 }
 
+
+// The Betty request struct holds information about a crop
+// request, and is created from a URL.Path
 type BettyRequest struct {
 	Id          string
 	RatioString string
@@ -139,20 +150,24 @@ type BettyRequest struct {
 	Format      string
 }
 
+// Get the BettyImage associated with this request.
 func (r BettyRequest) Image() (BettyImage, error) {
 	return GetBettyImage(r.Id)
 }
 
+// Get the absolute path to the file we're going ot create.
 func (r BettyRequest) Path() string {
 	var filename = fmt.Sprintf("%d.%s", r.Width, r.Format)
 	return filepath.Join(GetImageDir(r.Id), r.RatioString, filename)
 }
 
+// Get the size of the output image
 func (r BettyRequest) Size() image.Rectangle {
 	var height = int(math.Floor(float64(r.Width) * float64(r.Ratio().Y) / float64(r.Ratio().X)))
 	return image.Rect(0, 0, r.Width, height)
 }
 
+// Represent the image ratio as an image.Point.
 func (r BettyRequest) Ratio() image.Point {
 	if r.RatioString == "original" {
 		return image.Point{}
@@ -162,8 +177,8 @@ func (r BettyRequest) Ratio() image.Point {
 	return image.Point{w, h}
 }
 
-// This isn't really a "New" request, it's just parsing a URL. Do we even need it?
-func NewBettyRequest(URLPath string) (BettyRequest, error) {
+// Parse a URL.Path into BettyRequest, checking to make sure the URL is valid.
+func ParseBettyRequest(URLPath string) (BettyRequest, error) {
 	re := *imageRegexp
 	var submatches = re.FindStringSubmatch(URLPath)
 	if submatches == nil {

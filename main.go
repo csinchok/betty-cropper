@@ -25,7 +25,6 @@ import (
 )
 
 var BETTY_VERSION = "1.1.15"
-var IMAGE_RE = "^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>jpg|png)$"
 
 var (
 	version       = flag.Bool("version", false, "Print the version number and exit")
@@ -39,7 +38,6 @@ var (
 	nextId        = -1
 	adminReady    = false
 	c             = cache.New(15*time.Minute, 30*time.Second)
-	imageRegexp   = regexp.MustCompile(IMAGE_RE)
 )
 
 func loadConfig() {
@@ -135,7 +133,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	imageReq, err := NewBettyRequest(r.URL.Path)
+	imageReq, err := ParseBettyRequest(r.URL.Path)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return

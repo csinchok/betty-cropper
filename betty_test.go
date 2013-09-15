@@ -42,7 +42,7 @@ func TestIdParsing(t *testing.T) {
 
 func TestRequestParsing(t *testing.T) {
 	// Test a standard request
-	imageRequest, err := NewBettyRequest("/1234/16x9/600.jpg")
+	imageRequest, err := ParseBettyRequest("/1234/16x9/600.jpg")
 	if err != nil {
 		t.Errorf("Request parsing error: %s", err)
 	}
@@ -64,7 +64,7 @@ func TestRequestParsing(t *testing.T) {
 	}
 
 	// Test a request with a larger Id
-	imageRequest, err = NewBettyRequest("/1234/567/16x9/600.jpg")
+	imageRequest, err = ParseBettyRequest("/1234/567/16x9/600.jpg")
 	if err != nil {
 		t.Errorf("Request parsing error: %s", err)
 	}
@@ -85,15 +85,15 @@ func TestRequestParsing(t *testing.T) {
 	}
 
 	// Make sure that bad requests fail...
-	imageRequest, err = NewBettyRequest("/12345/16x9/600.jpg")
+	imageRequest, err = ParseBettyRequest("/12345/16x9/600.jpg")
 	if err == nil {
 		t.Error("Request parsing error ('/12345/16x9/600.jpg' is an invalid URL, but didn't error)")
 	}
-	imageRequest, err = NewBettyRequest("/1234/testing/600.jpg")
+	imageRequest, err = ParseBettyRequest("/1234/testing/600.jpg")
 	if err == nil {
 		t.Error("Request parsing error ('/1234/testing/600.jpg' is an invalid URL, but didn't error)")
 	}
-	imageRequest, err = NewBettyRequest("/1234/original/600.gif")
+	imageRequest, err = ParseBettyRequest("/1234/original/600.gif")
 	if err == nil {
 		t.Error("Request parsing error ('/1234/original/600.gif' is an invalid URL, but didn't error)")
 	}
