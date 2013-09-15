@@ -367,7 +367,10 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 
 	for i, ratio := range ratios {
 		var imageRatio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
-		selections[i] = getSelection(imageId, src.Bounds().Max, imageRatio)
+        _ = imageRatio
+		selections[i] = image.Rectangle{}
+
+        // getSelection(imageId, src.Bounds().Max, imageRatio)
 	}
 
 	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
