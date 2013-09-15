@@ -7,6 +7,7 @@ reqs:
 	go get github.com/argusdusty/Ferret
 	go get code.google.com/p/freetype-go/freetype
 	go get github.com/disintegration/imaging
+	go get github.com/pmylund/go-cache
 	go get github.com/jteeuwen/go-bindata
 
 bindata:

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-    "errors"
 	"flag"
 	"fmt"
 	"image"
@@ -12,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -20,27 +18,28 @@ import (
     "regexp"
 	"strconv"
 	"strings"
+    "time"
 
 	"github.com/disintegration/imaging"
+    "github.com/pmylund/go-cache"
 )
 
 var BETTY_VERSION = "1.1.15"
-
-// TODOs: Shouldn't be opening the image file more than once.
-// Memcached integration
-// Admin interface on a different ip
+var IMAGE_RE = "^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>jpg|png)$"
 
 var (
 	version       = flag.Bool("version", false, "Print the version number and exit")
 	configPath    = flag.String("config", "config.json", "Path for the config file")
 	imageRoot     = "/var/betty-cropper"
-	listen   = ":8888"
+	listen        = ":8888"
 	publicAddress = "localhost:8888"
 	debug         = false
 	imgmin        = false
 	ratios        []image.Point
 	nextId        = -1
 	adminReady    = false
+    c             = cache.New(15 * time.Minute, 30 * time.Second)
+    imageRegexp   = regexp.MustCompile(IMAGE_RE)
 )
 
 func loadConfig() {
@@ -130,113 +129,13 @@ func minify(src, dst string) {
 	os.Remove(src)
 }
 
-type ImageRequest struct {
-    Id     string
-    RatioString  string
-    Width  int
-    Format string
-}
-
-func (r ImageRequest) Dir() string {
-    var buffer bytes.Buffer
-    for index, value := range r.Id {
-        buffer.WriteRune(value)
-        if (index + 1) % 4 == 0 {
-            buffer.WriteString("/")
-        }
-    }
-    return filepath.Join(imageRoot, buffer.String());
-}
-
-func (r ImageRequest) Path() string {
-    var filename = fmt.Sprintf("%d.%s", r.Width, r.Format)
-    return filepath.Join(r.Dir(), r.RatioString, filename)
-}
-
-func (r ImageRequest) Size() image.Rectangle {
-    var height = int( math.Floor( float64(r.Width) * float64(r.Ratio().Y) / float64(r.Ratio().X) ) )
-    return image.Rect(0, 0, r.Width, height)
-}
-
-func (r ImageRequest) Ratio() image.Point {
-    if r.RatioString == "original" {
-        return image.Point{}
-    }
-    var w, _ = strconv.Atoi(strings.Split(r.RatioString, "x")[0])
-    var h, _ = strconv.Atoi(strings.Split(r.RatioString, "x")[1])
-    return image.Point{w, h}
-}
-
-func (r ImageRequest) Selection(imageSize image.Point) image.Rectangle {
-    var selectionJsonPath = filepath.Join(imageRoot, r.Id, "selections.json")
-
-    var selections map[string]image.Rectangle
-    selectionBytes, err := ioutil.ReadFile(selectionJsonPath)
-    if err == nil {
-        json.Unmarshal(selectionBytes, &selections)
-    } else {
-        selections = make(map[string]image.Rectangle, len(ratios))
-    }
-    // TODO: maybe pss the string into this?
-    if selection, ok := selections[r.RatioString]; ok {
-        return selection
-    }
-
-    var ratio = imageSize
-    if r.RatioString != "original" {
-        ratio = r.Ratio()
-    }
-
-    var originalRatio = float64(imageSize.X) / float64(imageSize.Y)
-    var selectionRatio = float64(ratio.X) / float64(ratio.Y)
-
-    var min = image.Pt(0, 0)
-    var max = imageSize
-
-    if selectionRatio < originalRatio {
-        var xOffset = (float64(imageSize.X) - (float64(imageSize.Y) * float64(ratio.X) / float64(ratio.Y))) / 2.0
-        min = image.Pt(int(math.Floor(xOffset)), 0)
-        max = image.Pt(imageSize.X - int(math.Floor(xOffset)), imageSize.Y)
-    }
-    if selectionRatio > originalRatio {
-        var yOffset = (float64(imageSize.Y) - (float64(imageSize.X) * float64(ratio.Y) / float64(ratio.X))) / 2.0
-
-        min = image.Pt(0, int(math.Floor(yOffset)))
-        max = image.Pt(imageSize.X, imageSize.Y - int(math.Floor(yOffset)))
-    }
-
-    return image.Rectangle{min, max}
-
-}
-
-var imageRegexp = regexp.MustCompile("^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>jpg|png)$")
-
-func NewImageRequest(URLPath string) (ImageRequest, error) {
-    re := *imageRegexp
-    var submatches = re.FindStringSubmatch(URLPath)
-    if submatches == nil {
-        return ImageRequest{}, errors.New("Bad image request")
-    }
-    width, err := strconv.Atoi(submatches[3])
-    if err != nil {
-        return ImageRequest{}, err
-    }
-    var imageReq = ImageRequest{
-        Id: strings.Join(strings.Split(submatches[1], "/"), ""),
-        RatioString: submatches[2],
-        Width: width,
-        Format: submatches[4],
-    }
-    return imageReq, nil
-}
-
 func crop(w http.ResponseWriter, r *http.Request) {
     if r.Method != "GET" {
         http.Error(w, "GET only, you asshole.", 405)
         return
     }
 
-    imageReq, err := NewImageRequest(r.URL.Path)
+    imageReq, err := NewBettyRequest(r.URL.Path)
     if err != nil {
         http.Error(w, err.Error(), 500)
         return
@@ -252,7 +151,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-	_, err = os.Stat(filepath.Join(imageRoot, imageReq.Id, "src"))
+    img, err := imageReq.Image()
 	if err != nil {
 		if debug {
 			placeholder(w, imageReq)
@@ -262,16 +161,14 @@ func crop(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+    var selection = img.Selection(imageReq.RatioString)
 
     src, err := imaging.Open(filepath.Join(imageRoot, imageReq.Id, "src"))
     if err != nil {
-        fmt.Println("Couldn't find an image. Did you set the image root?")
+        http.Error(w, "Couldn't find that.", 404);
+        return
     }
-    var selection = imageReq.Selection(src.Bounds().Max)
-
     var dst = imaging.Crop(src, selection)
-
-
 	dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
 
 	err = os.MkdirAll(filepath.Dir(imageReq.Path()), 0755)

@@ -28,7 +28,7 @@ var backgroundColors = []color.RGBA{
 }
 var backgroundIndex = 0
 
-func placeholder(w http.ResponseWriter, r ImageRequest) {
+func placeholder(w http.ResponseWriter, r BettyRequest) {
     // TODO: Don't do so much stupid shit with this font stuff.
 
     var dst = image.NewRGBA(r.Size())

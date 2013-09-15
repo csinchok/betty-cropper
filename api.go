@@ -15,7 +15,7 @@ import (
 	"html/template"
 
 	"github.com/argusdusty/Ferret"
-	"github.com/disintegration/imaging"
+	// "github.com/disintegration/imaging"
 )
 
 var SearchEngine *ferret.InvertedSuffix
@@ -352,28 +352,21 @@ func new(w http.ResponseWriter, r *http.Request) {
 
 func cropper(w http.ResponseWriter, r *http.Request) {
 	var imageId = strings.Split(r.URL.Path, "/")[2]
+    img, err := GetBettyImage(imageId)
+    if err != nil {
+        http.Error(w, err.Error(), 500)
+    }
 
-	src, err := imaging.Open(filepath.Join(imageRoot, imageId, "src"))
-	if err != nil {
-		log.Println(err)
-	}
-	var imageScale = 600.0 / float64(src.Bounds().Max.X)
-
-	if err != nil {
-		fmt.Println("Couldn't find an image. Did you set the image root?")
-	}
+	var imageScale = 600.0 / float64(img.Size.X)
 
 	var selections = make([]image.Rectangle, len(ratios))
 
 	for i, ratio := range ratios {
-		var imageRatio = fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
-        _ = imageRatio
-		selections[i] = image.Rectangle{}
-
-        // getSelection(imageId, src.Bounds().Max, imageRatio)
+        ratioString := fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
+		selections[i] = img.Selection(ratioString)
 	}
 
-	var scaled_size = image.Pt(600, int(600.0*float64(src.Bounds().Max.Y)/float64(src.Bounds().Max.X)))
+	var scaledSize = image.Pt(600, int(600.0*float64(img.Size.Y)/float64(img.Size.X)))
 
 	t := template.New("cropper.html")
 	t.Parse(string(html_cropper_html()))
@@ -381,7 +374,7 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 		"ImageId":       imageId,
 		"Ratios":        ratios,
 		"Selections":    selections,
-		"ScaledSize":    scaled_size,
+		"ScaledSize":    scaledSize,
 		"ImageScale":    imageScale,
 		"PublicAddress": publicAddress,
 	})
