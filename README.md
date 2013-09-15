@@ -1,3 +1,7 @@
+## Betty Cropper
+
+[![Build Status](https://travis-ci.org/csinchok/betty-cropper.png?branch=master)](https://travis-ci.org/csinchok/betty-cropper)
+
 ### Setup:
 
     > cp config.json.example config.json  # Edit values as necessary.
