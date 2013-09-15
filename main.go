@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+    "errors"
 	"flag"
 	"fmt"
 	"image"
@@ -18,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+    "regexp"
 	"strconv"
 	"strings"
 
@@ -179,8 +181,8 @@ var backgroundIndex = 0
 func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 	// TODO: Don't do so much stupid shit with this font stuff.
 
-	var ratio = ratioStringToPoint(imageReq.ratio)
-	var size = image.Rect(0, 0, imageReq.width, int(math.Floor(float64(imageReq.width)*float64(ratio.Y)/float64(ratio.X))))
+	var ratio = ratioStringToPoint(imageReq.Ratio)
+	var size = image.Rect(0, 0, imageReq.Width, int(math.Floor(float64(imageReq.Width)*float64(ratio.Y)/float64(ratio.X))))
 	var dst = image.NewRGBA(size)
 	backgroundIndex += 1
 	var backgroundColor = backgroundColors[backgroundIndex%len(backgroundColors)]
@@ -197,7 +199,7 @@ func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 
 	txtColor := image.White
 
-	var fontSize = float64(imageReq.width) * 52 / 300 // Stupid magic number
+	var fontSize = float64(imageReq.Width) * 52 / 300 // Stupid magic number
 
 	c := freetype.NewContext()
 	c.SetDPI(72)
@@ -210,7 +212,7 @@ func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 	var offsetFix = int(math.Floor(fontSize * 12 / 72)) // Stupid magic number
 
 	pt := freetype.Pt(0, int(c.PointToFix32(fontSize)>>8)-offsetFix)
-	pt, err = c.DrawString(imageReq.ratio, pt)
+	pt, err = c.DrawString(imageReq.Ratio, pt)
 	if err != nil {
 		log.Println(err)
 		return
@@ -227,26 +229,17 @@ func placeholder(w http.ResponseWriter, imageReq ImageRequest) {
 
 	draw.Draw(dst, txtBounds, txtImage, image.ZP, draw.Src)
 
-	if imageReq.format == "jpg" {
+	if imageReq.Format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
 		jpeg.Encode(w, dst, &jpeg.Options{90})
 		return
 	}
-	if imageReq.format == "png" {
+	if imageReq.Format == "png" {
 		w.Header().Set("Content-Type", "image/png")
 		png.Encode(w, dst)
 		return
 	}
 
-}
-
-type ImageRequest struct {
-	id     string
-	ratio  string
-	width  int
-	format string
-	dir    string
-	path   string
 }
 
 func cp(src, dst string) error {
@@ -286,6 +279,51 @@ func minify(src, dst string) {
 	os.Remove(src)
 }
 
+type ImageRequest struct {
+    Id     string
+    Ratio  string
+    Width  int
+    Format string
+}
+
+func (req ImageRequest) Dir() string {
+    var buffer bytes.Buffer
+    for index, value := range req.Id {
+        buffer.WriteRune(value)
+        if (index + 1) % 4 == 0 {
+            buffer.WriteString("/")
+        }
+    }
+    return filepath.Join(imageRoot, buffer.String());
+}
+
+func (req ImageRequest) Path() string {
+    var filename = fmt.Sprintf("%d.%s", req.Width, req.Format)
+    return filepath.Join(req.Dir(), req.Ratio, filename)
+}
+
+var imageRegexp = regexp.MustCompile("^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>gif|jpg|png)$")
+
+func NewImageRequest(r *http.Request) (ImageRequest, error) {
+    re := *imageRegexp
+    var submatches = re.FindStringSubmatch(r.URL.Path)
+    if submatches == nil {
+        return ImageRequest{}, errors.New("Bad image request")
+    }
+    width, err := strconv.Atoi(submatches[3])
+    if err != nil {
+        return ImageRequest{}, err
+    }
+    var imageReq = ImageRequest{
+        Id: strings.Join(strings.Split(submatches[1], "/"), ""),
+        Ratio: submatches[2],
+        Width: width,
+        Format: submatches[4],
+    }
+    return imageReq, nil
+}
+
+
 func crop(w http.ResponseWriter, r *http.Request) {
 
 	match, err := filepath.Match("/*/*/*.???", r.URL.Path)
@@ -296,20 +334,20 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	width, _ := strconv.Atoi(strings.Split(filepath.Base(r.URL.Path), ".")[0])
 	imageReq := ImageRequest{
-		width:  width,
-		format: strings.Split(filepath.Base(r.URL.Path), ".")[1],
-		ratio:  strings.Split(filepath.Dir(r.URL.Path), "/")[2],
-		id:     strings.Split(filepath.Dir(r.URL.Path), "/")[1],
-		dir:    filepath.Join(imageRoot, filepath.Dir(r.URL.Path)),
-		path:   r.URL.Path,
+		Width:  width,
+		Format: strings.Split(filepath.Base(r.URL.Path), ".")[1],
+		Ratio:  strings.Split(filepath.Dir(r.URL.Path), "/")[2],
+		Id:     strings.Split(filepath.Dir(r.URL.Path), "/")[1],
+		// dir:    filepath.Join(imageRoot, filepath.Dir(r.URL.Path)),
+		// path:   r.URL.Path,
 	}
 
-	if imageReq.width > 9000 {
+	if imageReq.Width > 9000 {
 		http.Error(w, "Enhance your calm, bro.", 420)
 		return
 	}
 
-	_, err = os.Stat(filepath.Join(imageRoot, imageReq.id, "src"))
+	_, err = os.Stat(filepath.Join(imageRoot, imageReq.Id, "src"))
 	if err != nil {
 		if debug {
 			placeholder(w, imageReq)
@@ -320,23 +358,23 @@ func crop(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var dst = imageCrop(imageReq.id, imageReq.ratio)
-	dst = imaging.Resize(dst, imageReq.width, 0, imaging.CatmullRom)
+	var dst = imageCrop(imageReq.Id, imageReq.Ratio)
+	dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
 
-	err = os.MkdirAll(imageReq.dir, 0755)
+	err = os.MkdirAll(imageReq.Dir(), 0755)
 	if err != nil {
-		log.Print(imageReq.dir)
+		log.Print(imageReq.Dir())
 		log.Println(err)
 	}
 
-	croppedPath := filepath.Join(imageRoot, imageReq.path)
+	croppedPath := filepath.Join(imageRoot, imageReq.Path())
 	if imgmin {
 		croppedPath = croppedPath + ".preopt"
 	}
 
 	outputWriter, _ := os.Create(croppedPath)
 
-	if imageReq.format == "jpg" {
+	if imageReq.Format == "jpg" {
 		w.Header().Set("Content-Type", "image/jpeg")
 		jpeg.Encode(w, dst, &jpeg.Options{75})
 		if imgmin {
@@ -345,19 +383,21 @@ func crop(w http.ResponseWriter, r *http.Request) {
 			jpeg.Encode(outputWriter, dst, &jpeg.Options{75})
 		}
 	}
-	if imageReq.format == "png" {
+	if imageReq.Format == "png" {
 		w.Header().Set("Content-Type", "image/png")
 		png.Encode(w, dst)
 		png.Encode(outputWriter, dst)
 	}
 
 	if imgmin {
-		go minify(croppedPath, filepath.Join(imageRoot, imageReq.path))
+		go minify(croppedPath, filepath.Join(imageRoot, imageReq.Path()))
 	}
 }
 
 func main() {
 	flag.Parse()
+
+    // imageRegexp = regexp.MustCompile("^(?P<image_id_path>(/[0-9]{1,4})+)/(?P<ratio>([0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>gif|jpg|png)$")
 
 	loadConfig()
 	go buildIndex()

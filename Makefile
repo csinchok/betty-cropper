@@ -22,5 +22,12 @@ build:
 	@echo "\x1b[31;1mBuilding...\x1b[0m"
 	go build
 
+runtests:
+	@echo "\x1b[31;1mTesting...\x1b[0m"
+	go test
+
+test: reqs bindata runtests clean
+
 clean:
+	@echo "\x1b[31;1mCleaning...\x1b[0m"
 	rm -f ./bindata_*.go
