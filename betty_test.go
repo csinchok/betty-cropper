@@ -122,6 +122,7 @@ func TestRequestParsing(t *testing.T) {
 
 func TestCrop(t *testing.T) {
     imageRoot, _ = filepath.Abs("testroot")
+    debug = false
 
     resp := httptest.NewRecorder()
     _ = resp
