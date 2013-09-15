@@ -54,11 +54,7 @@ func loadConfig() {
 
 	absConfigPath, err := filepath.Abs(*configPath)
 	if err != nil {
-		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
-		os.Exit(1)
-	}
-	if _, err = os.Stat(absConfigPath); err != nil {
-		log.Printf("Can't read the config file at \"%s\", exiting.\n", *configPath)
+		log.Printf("\"%s\" is a bad path for a config file, exiting.\n", *configPath)
 		os.Exit(1)
 	}
 
@@ -80,23 +76,25 @@ func loadConfig() {
 	}
 
 	var config Config
-	configBytes, err := ioutil.ReadFile(*configPath)
-	if err == nil {
-		json.Unmarshal(configBytes, &config)
-		adminListen = config.AdminListen
-		publicListen = config.PublicListen
-		publicAddress = config.PublicAddress
-		imageRoot = config.ImageRoot
+	configBytes, err := ioutil.ReadFile(absConfigPath)
+	if err != nil {
+        log.Printf("Can't read the config file, because \"%s\", exiting.\n", err)
+        os.Exit(1)
+    }
+	json.Unmarshal(configBytes, &config)
+	adminListen = config.AdminListen
+	publicListen = config.PublicListen
+	publicAddress = config.PublicAddress
+	imageRoot = config.ImageRoot
 
-		debug = config.Debug
+	debug = config.Debug
 
-		ratios = make([]image.Point, len(config.Ratios))
-		// ratios = [config.Ratios.len()]image.Point
-		for index, ratio := range config.Ratios {
-			var w, _ = strconv.Atoi(strings.Split(ratio, "x")[0])
-			var h, _ = strconv.Atoi(strings.Split(ratio, "x")[1])
-			ratios[index] = image.Pt(w, h)
-		}
+	ratios = make([]image.Point, len(config.Ratios))
+	// ratios = [config.Ratios.len()]image.Point
+	for index, ratio := range config.Ratios {
+		var w, _ = strconv.Atoi(strings.Split(ratio, "x")[0])
+		var h, _ = strconv.Atoi(strings.Split(ratio, "x")[1])
+		ratios[index] = image.Pt(w, h)
 	}
 }
 
