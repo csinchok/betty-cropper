@@ -9,3 +9,6 @@ install:
   - make bindata
 
 script: "make shorttests"
+
+notifications:
+  email: false
