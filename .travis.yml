@@ -9,4 +9,4 @@ install:
   - make reqs
   - make bindata
 
-script: "make runtests"
+script: "make travis"
