@@ -66,7 +66,7 @@ func TestRequestParsing(t *testing.T) {
         t.Errorf("Request parsing error (got '%s' for Id, should be '1234')", imageRequest.Id)
     }
     if imageRequest.RatioString != "16x9" {
-        t.Errorf("Request parsing error (got '%s' for Ratio, should be '16x9')", imageRequest.Ratio)
+        t.Errorf("Request parsing error (got '%s' for Ratio, should be '16x9')", imageRequest.RatioString)
     }
     if imageRequest.Width != 600 {
         t.Errorf("Request parsing error (got %d for width, should be 600)", imageRequest.Width)
@@ -90,7 +90,7 @@ func TestRequestParsing(t *testing.T) {
         t.Errorf("Request parsing error (got '%s' for Id, should be '1234567')", imageRequest.Id)
     }
     if imageRequest.RatioString != "16x9" {
-        t.Errorf("Request parsing error (got '%s' for Ratio, should be '16x9')", imageRequest.Ratio)
+        t.Errorf("Request parsing error (got '%s' for Ratio, should be '16x9')", imageRequest.RatioString)
     }
     if imageRequest.Width != 600 {
         t.Errorf("Request parsing error (got %d for width, should be 600)", imageRequest.Width)
