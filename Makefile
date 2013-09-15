@@ -23,11 +23,16 @@ build:
 	@echo "\x1b[31;1mBuilding...\x1b[0m"
 	go build
 
-runtests:
+fulltests:
 	@echo "\x1b[31;1mTesting...\x1b[0m"
 	go test
 
-test: reqs bindata runtests clean
+shorttests:
+	go test --short
+
+test: reqs bindata fulltests clean
+
+travis: reqs bindata shorttests clean
 
 clean:
 	@echo "\x1b[31;1mCleaning...\x1b[0m"

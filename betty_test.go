@@ -100,6 +100,10 @@ func TestRequestParsing(t *testing.T) {
 }
 
 func TestBettyImage(t *testing.T) {
+    if testing.Short() {
+        t.Skip("skipping test in short mode.")
+    }
+
 	imageRoot, _ = filepath.Abs("testroot")
 	debug = false
 

@@ -37,7 +37,7 @@ func GetImageDir(imageId string) string {
 	return filepath.Join(imageRoot, buffer.String())
 }
 
-// This function retrieves and caches the image info.
+// This function retrieves and caches the info for an image id.
 func GetBettyImage(imageId string) (BettyImage, error) {
 	data, found := c.Get(imageId)
 	if found {
