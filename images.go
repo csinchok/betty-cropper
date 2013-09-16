@@ -155,7 +155,7 @@ func (img BettyImage) Selection(ratioString string) image.Rectangle {
 }
 
 // Update a selection for an image, caching the selections, and also writing them to disk.
-func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle) error {
+func (img *BettyImage) SetSelection(ratioString string, selection image.Rectangle) error {
 
     // Update the selection
     img.Selections[ratioString] = selection
@@ -177,28 +177,36 @@ func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle
     return nil
 }
 
-
-func (img BettyImage) SetName(filename string) error {
-    img.Filename = filename
+func (img *BettyImage) SetName(filename string) error {
 
     // Delete the old link, add a new one
     srcPath := filepath.Join(GetImageDir(img.Id), "src")
-    oldPath, err := os.Readlink(srcPath)
-    if err != nil {
-        return err
-    }
-    newName := filename + filepath.Ext(oldPath)
-    newPath := filepath.Join(GetImageDir(img.Id), cleanImageName(newName))
-    os.Rename(oldPath, newPath)
-    os.Remove(srcPath)
-    err = os.Symlink(newPath, srcPath)
+    dst, err := os.Readlink(srcPath)
     if err != nil {
         return err
     }
 
-    // Cache it
-    c.Set(img.Id, img, 0)
+    oldPath := filepath.Join(GetImageDir(img.Id), dst)  // The original is linked using a relative path.
+    newName := filename + filepath.Ext(oldPath)  // The new name should have the same extension as the old one
+    newPath := filepath.Join(GetImageDir(img.Id), cleanImageName(newName))  // Let's make sure we don't have weird chars
+    
+    err = os.Rename(oldPath, newPath)  // Move the original
+    if err != nil {
+        return err
+    }
 
+    os.Remove(srcPath)  // Remove the src link
+    if err != nil {
+        return err
+    }
+
+    err = os.Symlink(newPath, srcPath)  // Add the new link
+    if err != nil {
+        return err
+    }
+
+    img.Filename = newName  // Update the object
+    c.Set(img.Id, img, 0) // Cache it
     return nil
 }
 

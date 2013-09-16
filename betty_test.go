@@ -160,3 +160,26 @@ func TestIndexing(t *testing.T) {
         t.Errorf("Found %d results for 'lenna', there should be 1", len(ids))
     }
 }
+
+func TestSetters(t *testing.T) {
+    img, err := GetBettyImage("1")
+    if err != nil {
+        t.Errorf("Error getting image info: %s", err.Error())
+    }
+
+    // Test the Setters
+    err = img.SetSelection("3x1", image.Rect(0, 140, 512, 310))
+    if err != nil {
+        t.Errorf("Error setting image selection: %s", err.Error())
+    }
+    if img.Selections["3x1"] != image.Rect(0, 140, 512, 310) {
+        t.Errorf("Selection['3x1'] should be '0,140,512,310', but it's not.")
+    }
+    err = img.SetName("Farts")
+    if err != nil {
+        t.Errorf("Error setting image name: %s", err.Error())
+    }
+    if img.Filename != "Farts.png" {
+        t.Errorf("Filename should be 'Farts.png', but we got '%s'", img.Filename)
+    }
+}

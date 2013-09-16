@@ -24,8 +24,9 @@ build:
 	go build
 
 testenv:
+	@echo "\x1b[31;1mConfiguring test environment...\x1b[0m"
 	rm -r testroot/*
-	git checkout testroot
+	git checkout -- testroot
 	cd testroot/1/ && ln -f -s Lenna.png src
 	cd testroot/1234/5123 && ln -f -s Lemma.png src
 
