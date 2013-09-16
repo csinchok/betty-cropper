@@ -20,61 +20,38 @@ import (
 
 var SearchEngine *ferret.InvertedSuffix
 
-type SearchResult struct {
-	ImageId string `json:"imageId"`
-	Name    string `json:"name"`
-	Credit  string `json:"credit"`
+type IndexedImage struct {
+    Id      string
+	Name    string
 }
 
-func cleanImageName(s string) string {
-	return strings.Replace(s, " ", "_", -1)
-}
-
-func expandImageName(s string) string {
-	return strings.Replace(s, "_", " ", -1)
-}
-
+// TODO: Rebuild this to iterate over the full filesystem
 func buildIndex() {
 	SearchEngine = ferret.New(make([]string, 0), make([]string, 0), make([]interface{}, 0), ferret.UnicodeToLowerASCII)
 
-	dirList, err := ioutil.ReadDir(imageRoot)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(dirList) == 0 {
-		nextId = 1
-	} else {
-		for _, dir := range dirList {
-			srcPath := filepath.Join(imageRoot, dir.Name(), "src")
-
-			var creditString string
-			creditPath := filepath.Join(imageRoot, dir.Name(), "credit.txt")
-			creditBytes, err := ioutil.ReadFile(creditPath)
-			if err == nil {
-				creditString = string(creditBytes)
-			}
-
-			dest, err := os.Readlink(srcPath)
-			if err == nil {
-				imageId, err := strconv.Atoi(dir.Name())
-				if err == nil {
-					if imageId >= nextId {
-						nextId = imageId + 1
-					}
-				} else {
-					log.Println(err.Error())
-				}
-				filename := filepath.Base(dest)
-				imageName := strings.Replace(filename, filepath.Ext(filename), "", 1)
-				data := SearchResult{
-					Name:    expandImageName(imageName),
-					ImageId: dir.Name(),
-					Credit:  creditString,
-				}
-				SearchEngine.Insert(filepath.Base(dest), dir.Name(), data)
-			}
-		}
-	}
+	nextId = 1
+    filepath.Walk(imageRoot, func(path string, info os.FileInfo, err error) error {
+        if filepath.Base(path) == "src" {
+            dir, err := filepath.Rel(imageRoot, filepath.Dir(path))
+            if err != nil {
+                return err
+            }
+            dstPath, err := os.Readlink(path)
+            if err != nil {
+                return err
+            }
+            data := IndexedImage{
+                Id: strings.Join(strings.Split(dir, "/"), ""),
+                Name: expandImageName(filepath.Base(dstPath)),
+            }
+            id, err := strconv.Atoi(data.Id)
+            if err == nil && id >= nextId {
+                nextId = id + 1
+            }
+            SearchEngine.Insert(data.Name, data.Id, data)
+        }
+        return nil
+    })
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
@@ -93,21 +70,35 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+    type SearchResult struct {
+        Id       string  `json:"id"`
+        Name     string  `json:"name"`
+        Filename string  `json:"filename"`
+        Credit   string  `json:"credit,omitempty"`
+        Size     string  `json:"size"`
+    }
+
 	queryList, ok := r.URL.Query()["q"]
 	var query = ""
 	if ok {
 		query = queryList[0]
 	}
 
-	ids, values := SearchEngine.Query(query, 25)
+	ids, _ := SearchEngine.Query(query, 25)
 	var results []SearchResult = make([]SearchResult, len(ids))
 	for index, id := range ids {
-		data := values[index]
-		results[index] = SearchResult{
-			ImageId: id,
-			Name:    data.(SearchResult).Name,
-			Credit:  data.(SearchResult).Credit,
-		}
+        img, err := GetBettyImage(id)
+        if err == nil {
+            results[index] = SearchResult{
+                Id: img.Id,
+                Credit: img.Credit,
+                Filename: img.Filename,
+                Name: img.Name(),
+                Size: fmt.Sprintf("%dx%d", img.Size.X, img.Size.Y),
+            }
+        } else {
+            results[index] = SearchResult{}
+        }
 	}
 
 	b, err := json.Marshal(results)
@@ -149,6 +140,12 @@ func api(w http.ResponseWriter, r *http.Request) {
 		var imageId = filepath.Base(filepath.Dir(r.URL.Path))
 		var imageRatio = filepath.Base(r.URL.Path)
 
+        img, err := GetBettyImage(imageId)
+        if err != nil {
+            http.Error(w, err.Error(), 404)
+            return
+        }
+
 		minX, err := strconv.Atoi(r.FormValue("minX"))
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -170,62 +167,34 @@ func api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var selections map[string]image.Rectangle
-		var selection_json_path = imageRoot + "/" + imageId + "/selections.json"
-		selection_bytes, err := ioutil.ReadFile(selection_json_path)
-		if err == nil {
-			json.Unmarshal(selection_bytes, &selections)
-		} else {
-			// TODO: Make dynamic based on the number of ratios
-			selections = make(map[string]image.Rectangle, 5)
-		}
+		var selection = image.Rect(minX, minY, maxX, maxY)
+        err = img.SetSelection(imageRatio, selection)
+        if err != nil {
+            http.Error(w, err.Error(), 500)
+        }
 
-		// TODO: validate image ratio
-		selections[imageRatio] = image.Rectangle{
-			image.Point{minX, minY},
-			image.Point{maxX, maxY},
-		}
-
-		data, err := json.Marshal(selections)
-		err = ioutil.WriteFile(selection_json_path, data, 0777)
-		if err != nil {
-			log.Println(err)
-		}
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
+		return
 	}
 
 	if matched, _ := filepath.Match("/api/*", r.URL.Path); matched {
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 
 		var imageId = filepath.Base(r.URL.Path)
-		_ = imageId
-
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(200)
 			fmt.Fprintln(w, "")
 		}
 
+        img, err := GetBettyImage(imageId)
+        if err != nil {
+            http.Error(w, err.Error(), 404)
+            return
+        }
+
 		if r.Method == "GET" {
-			srcPath := filepath.Join(imageRoot, imageId, "src")
-			originalPath, err := os.Readlink(srcPath)
-			filename := filepath.Base(originalPath)
-			name := strings.Replace(filename, filepath.Ext(filename), "", 1)
-
-			var creditString string
-			creditPath := filepath.Join(imageRoot, imageId, "credit.txt")
-			creditBytes, err := ioutil.ReadFile(creditPath)
-			if err == nil {
-				creditString = string(creditBytes)
-			}
-
-			imageData := SearchResult{
-				ImageId: imageId,
-				Name:    expandImageName(name),
-				Credit:  creditString,
-			}
-			data, err := json.Marshal(imageData)
+			data, _ := json.Marshal(img)
 			w.WriteHeader(200)
 			w.Write(data)
 			return
@@ -334,10 +303,9 @@ func new(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := SearchResult{
-		Name:    filename,
-		ImageId: imageId,
-		Credit:  "",
+	data := IndexedImage{
+		Name: filename,
+		Id:   imageId,
 	}
 	SearchEngine.Insert(filename, imageId, data)
 
@@ -350,7 +318,8 @@ func cropper(w http.ResponseWriter, r *http.Request) {
 	var imageId = strings.Split(r.URL.Path, "/")[2]
 	img, err := GetBettyImage(imageId)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, "Couldn't find that", 404)
+        return
 	}
 
 	var imageScale = 600.0 / float64(img.Size.X)

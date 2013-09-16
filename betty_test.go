@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "log"
+    "image"
 	"path/filepath"
 	"testing"
 	// "net/http/httptest"
@@ -118,16 +118,45 @@ func TestBettyImage(t *testing.T) {
 	if img.Size.X != 512 || img.Size.Y != 512 {
 		t.Errorf("Size should be '512x512', but we got '%dx%d'", img.Size.X, img.Size.Y)
 	}
+    if img.Selections["3x1"] != image.Rect(0, 144, 512, 314) {
+        t.Errorf("Selection['3x1'] should be '0,144,512,314', but it's not.")
+    }
 
 	// Test with a longer id
 	img, err = GetBettyImage("12345123")
 	if err != nil {
 		t.Errorf("Error getting image info: %s", err.Error())
 	}
-	if img.Filename != "Lenna.png" {
-		t.Errorf("Filename should be 'Lenna.png', but we got '%s'", img.Filename)
+	if img.Filename != "Lemma.png" {
+		t.Errorf("Filename should be 'Lemma.png', but we got '%s'", img.Filename)
 	}
 	if img.Size.X != 512 || img.Size.Y != 512 {
 		t.Errorf("Size should be '512x512', but we got '%dx%d'", img.Size.X, img.Size.Y)
 	}
+}
+
+func TestIndexing(t *testing.T) {
+    imageRoot, _ = filepath.Abs("testroot")
+    debug = false
+
+    buildIndex()
+
+    if nextId != 12345124 {
+        t.Errorf("nextId should be 12345124, but is %d", nextId)
+    }
+
+    ids, _ := SearchEngine.Query("", 25)
+    if len(ids) != 2 {
+        t.Errorf("Found %d results for '', there should be 2", len(ids))
+    }
+
+    ids, _ = SearchEngine.Query("lemma", 25)
+    if len(ids) != 1 {
+        t.Errorf("Found %d results for 'lemma', there should be 1", len(ids))
+    }
+
+    ids, _ = SearchEngine.Query("lenna", 25)
+    if len(ids) != 1 {
+        t.Errorf("Found %d results for 'lenna', there should be 1", len(ids))
+    }
 }

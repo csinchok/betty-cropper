@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+    "regexp"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -31,14 +32,27 @@ type BettyImage struct {
 // images, we need to split things into subdirectories. This function
 // gives us the base directory for a given image id.
 func GetImageDir(imageId string) string {
-	var buffer bytes.Buffer
-	for index, value := range imageId {
-		buffer.WriteRune(value)
-		if (index+1)%4 == 0 {
-			buffer.WriteString("/")
-		}
-	}
-	return filepath.Join(imageRoot, buffer.String())
+	return filepath.Join(imageRoot, GetRelImageDir(imageId))
+}
+
+func cleanImageName(s string) string {
+    return strings.Replace(s, " ", "_", -1)
+}
+
+func expandImageName(s string) string {
+    return strings.Replace(s, "_", " ", -1)
+}
+
+// Just used for redirects....
+func GetRelImageDir(imageId string) string {
+    var buffer bytes.Buffer
+    for index, value := range imageId {
+        buffer.WriteRune(value)
+        if (index+1)%4 == 0 {
+            buffer.WriteString("/")
+        }
+    }
+    return buffer.String()
 }
 
 // This function retrieves and caches the info for an image id.
@@ -138,6 +152,48 @@ func (img BettyImage) Selection(ratioString string) image.Rectangle {
 	}
 
 	return image.Rectangle{min, max}
+}
+
+// Update a selection for an image, caching the selections, and also writing them to disk.
+func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle) error {
+
+    // Update the selection
+    img.Selections[ratioString] = selection
+    
+    // Cache it
+    c.Set(img.Id, img, 0)
+
+    // Serialize it, and write it out to disk
+    data, err := json.Marshal(img.Selections)
+    if err != nil {
+        return err
+    }
+    selectionsJsonPath := filepath.Join(GetImageDir(img.Id), "selections.json")
+    return ioutil.WriteFile(selectionsJsonPath, data, 0644)
+}
+
+
+func (img BettyImage) SetName(name string) error {
+    img.Name = name
+
+    // Cache it
+    c.Set(img.Id, img, 0)
+
+    // Delete the old link, add a new one
+    srcPath := filepath.Join(GetImageDir(imageId), "src")
+    oldPath, err := os.Readlink(srcPath)
+    if err != nil {
+        return err
+    }
+    newName := name + filepath.Ext(oldPath)
+    newPath := filepath.Join(GetImageDir(imageId), cleanImageName(newName))
+    os.Rename(oldPath, newPath)
+    os.Remove(srcPath)
+    err = os.Symlink(newPath, srcPath)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 

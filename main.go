@@ -27,17 +27,18 @@ import (
 var BETTY_VERSION = "1.1.15"
 
 var (
-	version       = flag.Bool("version", false, "Print the version number and exit")
-	configPath    = flag.String("config", "config.json", "Path for the config file")
-	imageRoot     = "/var/betty-cropper"
-	listen        = ":8888"
-	publicAddress = "localhost:8888"
-	debug         = false
-	imgmin        = false
-	ratios        []image.Point
-	nextId        = -1
-	adminReady    = false
-	c             = cache.New(15*time.Minute, 30*time.Second)
+	version        = flag.Bool("version", false, "Print the version number and exit")
+	configPath     = flag.String("config", "config.json", "Path for the config file")
+	imageRoot      = "/var/betty-cropper"
+	listen         = ":8888"
+	publicAddress  = "localhost:8888"
+	debug          = false
+	imgmin         = false
+	ratios         []image.Point
+	nextId         = -1
+	adminReady     = false
+	c              = cache.New(15*time.Minute, 30*time.Second)
+    redirectRegexp = regexp.MustCompile("^/([0-9]{5,})/((?:[0-9]+x[0-9]+)|original)/([0-9]+).(jpg|png)$")
 )
 
 func loadConfig() {
@@ -135,6 +136,15 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	imageReq, err := ParseBettyRequest(r.URL.Path)
 	if err != nil {
+        re := *redirectRegexp
+        var submatches = re.FindStringSubmatch(r.URL.Path)
+        if submatches != nil {
+            var location = fmt.Sprintf("/%s/%s/%s.%s", GetRelImageDir(submatches[1]), submatches[2], submatches[3], submatches[4])
+            http.Redirect(w, r, location, 301)
+            return
+        }
+        
+
 		http.Error(w, err.Error(), 500)
 		return
 	}

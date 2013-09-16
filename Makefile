@@ -24,8 +24,8 @@ build:
 	go build
 
 link:
-	cd testroot/1/ && ln -s Lenna.png src
-	cd testroot/1234/5123 && ln -s Lenna.png src
+	cd testroot/1/ && ln -f -s Lenna.png src
+	cd testroot/1234/5123 && ln -f -s Lemma.png src
 
 fulltests:
 	@echo "\x1b[31;1mTesting...\x1b[0m"
