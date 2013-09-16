@@ -23,7 +23,9 @@ build:
 	@echo "\x1b[31;1mBuilding...\x1b[0m"
 	go build
 
-link:
+testenv:
+	rm -r testroot/*
+	git checkout testroot
 	cd testroot/1/ && ln -f -s Lenna.png src
 	cd testroot/1234/5123 && ln -f -s Lemma.png src
 
@@ -34,7 +36,7 @@ fulltests:
 shorttests:
 	go test --short
 
-test: reqs bindata link fulltests clean
+test: reqs bindata testenv fulltests clean
 
 clean:
 	@echo "\x1b[31;1mCleaning...\x1b[0m"
