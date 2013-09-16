@@ -159,9 +159,6 @@ func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle
 
     // Update the selection
     img.Selections[ratioString] = selection
-    
-    // Cache it
-    c.Set(img.Id, img, 0)
 
     // Serialize it, and write it out to disk
     data, err := json.Marshal(img.Selections)
@@ -169,15 +166,20 @@ func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle
         return err
     }
     selectionsJsonPath := filepath.Join(GetImageDir(img.Id), "selections.json")
-    return ioutil.WriteFile(selectionsJsonPath, data, 0644)
+    err = ioutil.WriteFile(selectionsJsonPath, data, 0644)
+    if err != nil {
+        return err
+    }
+
+    // Cache it
+    c.Set(img.Id, img, 0)
+
+    return nil
 }
 
 
 func (img BettyImage) SetName(filename string) error {
     img.Filename = filename
-
-    // Cache it
-    c.Set(img.Id, img, 0)
 
     // Delete the old link, add a new one
     srcPath := filepath.Join(GetImageDir(img.Id), "src")
@@ -193,6 +195,10 @@ func (img BettyImage) SetName(filename string) error {
     if err != nil {
         return err
     }
+
+    // Cache it
+    c.Set(img.Id, img, 0)
+
     return nil
 }
 

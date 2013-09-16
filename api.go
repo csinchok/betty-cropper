@@ -202,21 +202,11 @@ func api(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method == "POST" {
 			if r.FormValue("name") != "" {
-				srcPath := filepath.Join(imageRoot, imageId, "src")
-				oldPath, err := os.Readlink(srcPath)
-				if err == nil {
-					newName := r.FormValue("name") + filepath.Ext(oldPath)
-					newPath := filepath.Join(imageRoot, imageId, cleanImageName(newName))
-					os.Rename(oldPath, newPath)
-					os.Remove(srcPath)
-					err = os.Symlink(newPath, srcPath)
-					if err != nil {
-						http.Error(w, err.Error(), 500)
-						return
-					}
-				} else {
-					log.Println(err)
-				}
+                err = img.SetName(r.FormValue("name"))
+                if err != nil {
+                    http.Error(w, err.Error(), 500)
+                    return
+                }
 			}
 
 			if creditString := r.FormValue("credit"); creditString != "" {
