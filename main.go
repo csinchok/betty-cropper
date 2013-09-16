@@ -24,7 +24,7 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-var BETTY_VERSION = "1.2.0"
+var BETTY_VERSION = "1.2.1"
 
 var (
 	version        = flag.Bool("version", false, "Print the version number and exit")
@@ -139,7 +139,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
         re := *redirectRegexp
         var submatches = re.FindStringSubmatch(r.URL.Path)
         if submatches != nil {
-            var location = fmt.Sprintf("/%s/%s/%s.%s", GetRelImageDir(submatches[1]), submatches[2], submatches[3], submatches[4])
+            var location = fmt.Sprintf("%s/%s/%s/%s.%s", publicAddress, GetRelImageDir(submatches[1]), submatches[2], submatches[3], submatches[4])
             http.Redirect(w, r, location, 301)
             return
         }

@@ -9,6 +9,7 @@ reqs:
 	go get github.com/disintegration/imaging
 	go get github.com/pmylund/go-cache
 	go get github.com/jteeuwen/go-bindata
+	go get github.com/axw/gocov/gocov
 
 bindata:
 	@echo "\x1b[31;1mConverting static resources to golang...\x1b[0m"

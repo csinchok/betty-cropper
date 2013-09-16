@@ -1,7 +1,6 @@
 {
 	"imageRoot": "/var/betty-cropper",
-	"adminListen": ":9999",
-	"publicListen": ":8888",
+	"listen": ":8698",
 	"publicAddress": "http://localhost:8888",
 	"ratios": [
 		"1x1",
