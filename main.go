@@ -35,7 +35,7 @@ var (
 	debug          = false
 	imgmin         = false
 	ratios         []image.Point
-	nextId         = -1
+	nextId         = 1
 	adminReady     = false
 	c              = cache.New(15*time.Minute, 30*time.Second)
     redirectRegexp = regexp.MustCompile("^/([0-9]{5,})/((?:[0-9]+x[0-9]+)|original)/([0-9]+).(jpg|png)$")
