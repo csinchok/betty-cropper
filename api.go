@@ -26,8 +26,9 @@ type IndexedImage struct {
 }
 
 func buildIndex() {
-	SearchEngine = ferret.New(make([]string, 0), make([]string, 0), make([]interface{}, 0), ferret.UnicodeToLowerASCII)
-    var count = 1
+    var ids = make([]string, 0)
+    var names = make([]string, 0)
+    var datums = make([]interface{}, 0)
     filepath.Walk(imageRoot, func(path string, info os.FileInfo, err error) error {
         if filepath.Base(path) == "src" {
             dir, err := filepath.Rel(imageRoot, filepath.Dir(path))
@@ -42,18 +43,19 @@ func buildIndex() {
                 Id: strings.Join(strings.Split(dir, "/"), ""),
                 Name: expandImageName(filepath.Base(dstPath)),
             }
+
+            ids = append(ids, data.Id)
+            names = append(names, data.Name)
+            datums = append(datums, data)
+
             id, err := strconv.Atoi(data.Id)
             if err == nil && id >= nextId {
                 nextId = id + 1
             }
-            count += 1
-            if count % 100 == 0 {
-                log.Printf("Indexed %d items...\n", count)
-            }
-            SearchEngine.Insert(data.Name, data.Id, data)
         }
         return nil
     })
+    SearchEngine = ferret.New(names, ids, datums, ferret.UnicodeToLowerASCII)
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
