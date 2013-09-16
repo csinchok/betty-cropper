@@ -173,20 +173,20 @@ func (img BettyImage) SetSelection(ratioString string, selection image.Rectangle
 }
 
 
-func (img BettyImage) SetName(name string) error {
-    img.Name = name
+func (img BettyImage) SetName(filename string) error {
+    img.Filename = filename
 
     // Cache it
     c.Set(img.Id, img, 0)
 
     // Delete the old link, add a new one
-    srcPath := filepath.Join(GetImageDir(imageId), "src")
+    srcPath := filepath.Join(GetImageDir(img.Id), "src")
     oldPath, err := os.Readlink(srcPath)
     if err != nil {
         return err
     }
-    newName := name + filepath.Ext(oldPath)
-    newPath := filepath.Join(GetImageDir(imageId), cleanImageName(newName))
+    newName := filename + filepath.Ext(oldPath)
+    newPath := filepath.Join(GetImageDir(img.Id), cleanImageName(newName))
     os.Rename(oldPath, newPath)
     os.Remove(srcPath)
     err = os.Symlink(newPath, srcPath)
