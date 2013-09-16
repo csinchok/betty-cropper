@@ -178,4 +178,11 @@ func TestSetters(t *testing.T) {
     if img.Filename != "Farts.png" {
         t.Errorf("Filename should be 'Farts.png', but we got '%s'", img.Filename)
     }
+    err = img.SetCredit("Farty McFarter")
+    if err != nil {
+        t.Errorf("Error setting image credit: %s", err.Error())
+    }
+    if img.Credit != "Farty McFarter" {
+        t.Errorf("Credit should be 'Farty McFarter', but we got '%s'", img.Credit)
+    }
 }

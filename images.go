@@ -210,6 +210,40 @@ func (img *BettyImage) SetName(filename string) error {
     return nil
 }
 
+func (img *BettyImage) SetCredit(credit string) error {
+    creditPath := filepath.Join(GetImageDir(img.Id), "credit.txt")
+    creditFile, err := os.Create(creditPath)
+    if err != nil {
+        return err
+    }
+    err = creditFile.Truncate(0)
+
+    _, err = creditFile.WriteString(credit)
+    if err != nil {
+        return err
+    }
+
+    img.Credit = credit  // Update the object
+    c.Set(img.Id, img, 0) // Cache it
+    return nil
+}
+
+type SearchResult struct {
+    Id       string  `json:"id"`
+    Name     string  `json:"name"`
+    Filename string  `json:"filename"`
+    Credit   string  `json:"credit,omitempty"`
+    Size     string  `json:"size"`
+}
+func (img BettyImage) Serialized() SearchResult {
+    return SearchResult{
+        Id: img.Id,
+        Credit: img.Credit,
+        Filename: img.Filename,
+        Name: img.Name(),
+        Size: fmt.Sprintf("%dx%d", img.Size.X, img.Size.Y),
+    }
+}
 
 // The Betty request struct holds information about a crop
 // request, and is created from a URL.Path

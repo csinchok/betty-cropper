@@ -70,14 +70,6 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    type SearchResult struct {
-        Id       string  `json:"id"`
-        Name     string  `json:"name"`
-        Filename string  `json:"filename"`
-        Credit   string  `json:"credit,omitempty"`
-        Size     string  `json:"size"`
-    }
-
 	queryList, ok := r.URL.Query()["q"]
 	var query = ""
 	if ok {
@@ -89,13 +81,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 	for index, id := range ids {
         img, err := GetBettyImage(id)
         if err == nil {
-            results[index] = SearchResult{
-                Id: img.Id,
-                Credit: img.Credit,
-                Filename: img.Filename,
-                Name: img.Name(),
-                Size: fmt.Sprintf("%dx%d", img.Size.X, img.Size.Y),
-            }
+            results[index] = img.Serialized()
         } else {
             results[index] = SearchResult{}
         }
@@ -125,52 +111,51 @@ func api(w http.ResponseWriter, r *http.Request) {
 	if matched, _ := filepath.Match("/api/*/*", r.URL.Path); matched {
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 
-		log.Println(r.URL.Path)
-
-		if r.Method != "POST" {
-			http.Error(w, "POST only, you asshole.", 405)
-			return
-		}
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(200)
 			fmt.Fprintln(w, 200)
 			return
 		}
+        if r.Method != "POST" {
+            http.Error(w, "POST only, you asshole.", 405)
+            return
+        }
 
 		var imageId = filepath.Base(filepath.Dir(r.URL.Path))
 		var imageRatio = filepath.Base(r.URL.Path)
 
         img, err := GetBettyImage(imageId)
         if err != nil {
-            http.Error(w, err.Error(), 404)
+            http.Error(w, err.Error(), 500)
             return
         }
 
 		minX, err := strconv.Atoi(r.FormValue("minX"))
 		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
+            http.Error(w, err.Error(), 500)
+            return
 		}
 		minY, err := strconv.Atoi(r.FormValue("minY"))
 		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
+            http.Error(w, err.Error(), 500)
+            return			
 		}
 		maxX, err := strconv.Atoi(r.FormValue("maxX"))
 		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
+            http.Error(w, err.Error(), 500)
+            return
 		}
 		maxY, err := strconv.Atoi(r.FormValue("maxY"))
 		if err != nil {
 			http.Error(w, err.Error(), 500)
-			return
+            return
 		}
 
 		var selection = image.Rect(minX, minY, maxX, maxY)
         err = img.SetSelection(imageRatio, selection)
         if err != nil {
             http.Error(w, err.Error(), 500)
+            return
         }
 
 		w.WriteHeader(200)
@@ -194,7 +179,7 @@ func api(w http.ResponseWriter, r *http.Request) {
         }
 
 		if r.Method == "GET" {
-			data, _ := json.Marshal(img)
+			data, _ := json.Marshal(img.Serialized())
 			w.WriteHeader(200)
 			w.Write(data)
 			return
@@ -210,29 +195,25 @@ func api(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if creditString := r.FormValue("credit"); creditString != "" {
-				creditPath := filepath.Join(imageRoot, imageId, "credit.txt")
-				creditFile, err := os.Create(creditPath)
-				if err != nil {
-					http.Error(w, err.Error(), 500)
-					return
-				}
-				err = creditFile.Truncate(0)
-
-				_, err = creditFile.WriteString(creditString)
-				if err != nil {
-					log.Println(err)
-				}
+                err = img.SetCredit(creditString)
+                if err != nil {
+                    http.Error(w, err.Error(), 500)
+                    return
+                }
 			}
 
-			w.WriteHeader(200)
-			fmt.Fprintln(w, "")
+            data, _ := json.Marshal(img.Serialized())
+            w.WriteHeader(200)
+            w.Write(data)
+            return
 
 			// This sucks, but we need to totally rebuild the index after we update anything
 			go buildIndex()
 			return
 		}
 
-		return
+		http.Error(w, "Couldn't find that", 404)
+        return
 	}
 }
 
