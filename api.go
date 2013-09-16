@@ -29,6 +29,7 @@ func buildIndex() {
     var ids = make([]string, 0)
     var names = make([]string, 0)
     var datums = make([]interface{}, 0)
+    var count = 0
     filepath.Walk(imageRoot, func(path string, info os.FileInfo, err error) error {
         if filepath.Base(path) == "src" {
             dir, err := filepath.Rel(imageRoot, filepath.Dir(path))
@@ -47,6 +48,10 @@ func buildIndex() {
             ids = append(ids, data.Id)
             names = append(names, data.Name)
             datums = append(datums, data)
+            count += 1
+            if count % 1000 == 0 {
+                log.Printf("Crawled %d items...", count)
+            }
 
             id, err := strconv.Atoi(data.Id)
             if err == nil && id >= nextId {

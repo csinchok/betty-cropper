@@ -24,14 +24,14 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-var BETTY_VERSION = "1.2.4"
+var BETTY_VERSION = "1.2.5"
 
 var (
 	version        = flag.Bool("version", false, "Print the version number and exit")
 	configPath     = flag.String("config", "config.json", "Path for the config file")
 	imageRoot      = "/var/betty-cropper"
-	listen         = ":8888"
-	publicAddress  = "localhost:8888"
+	listen         = ":8698"
+	publicAddress  = "http://localhost:8698"
 	debug          = false
 	imgmin         = false
 	ratios         []image.Point
@@ -150,12 +150,12 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if imageReq.Width > 3000 {
-		http.Error(w, "Couldn't find that.", 404)
+		http.Error(w, "Image too large", 420)
 		return
 	}
 
 	if imageReq.Width < 1 {
-		http.Error(w, "Couldn't find that.", 404)
+		http.Error(w, "Image too small", 403)
 		return
 	}
 
@@ -171,7 +171,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 	var selection = img.Selection(imageReq.RatioString)
 
-	src, err := imaging.Open(filepath.Join(imageRoot, imageReq.Id, "src"))
+	src, err := img.Open()
 	if err != nil {
 		http.Error(w, "Couldn't find that.", 404)
 		return

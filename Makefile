@@ -38,7 +38,7 @@ fulltests:
 shorttests:
 	go test --short
 
-test: reqs bindata testenv fulltests clean testenv
+test: reqs bindata fulltests clean testenv
 
 clean:
 	@echo "\x1b[31;1mCleaning...\x1b[0m"
