@@ -25,7 +25,6 @@ type IndexedImage struct {
 	Name    string
 }
 
-// TODO: Rebuild this to iterate over the full filesystem
 func buildIndex() {
 	SearchEngine = ferret.New(make([]string, 0), make([]string, 0), make([]interface{}, 0), ferret.UnicodeToLowerASCII)
 
@@ -220,7 +219,7 @@ func api(w http.ResponseWriter, r *http.Request) {
 func new(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
+    w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(200)
@@ -239,31 +238,40 @@ func new(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "POST error", 500)
 		return
 	}
+    imgData, _, err := image.Decode(file)
+    if err != nil {
+        http.Error(w, "File error", 500)
+        return
+    }
 
 	var filename = fileHeader.Filename
 	if r.FormValue("name") != "" {
 		filename = r.FormValue("name") + filepath.Ext(filename)
 	}
 
-	srcData, err := ioutil.ReadAll(file)
-	if err != nil {
-		http.Error(w, "File error", 500)
-		return
-	}
+    img := BettyImage{
+        Id: strconv.Itoa(nextId),
+        Filename: cleanImageName(filename),
+        Size: imgData.Bounds().Max,
+    }
 
-	var imageId = strconv.Itoa(nextId)
-	nextId += 1
+    nextId += 1  // TODO: Add mutex here?
 
-	err = os.MkdirAll(filepath.Join(imageRoot, imageId), 0755)
+	err = os.MkdirAll(GetImageDir(img.Id), 0755)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	var srcPath = filepath.Join(imageRoot, imageId, cleanImageName(filename))
-	var srcLinkPath = filepath.Join(imageRoot, imageId, "src")
+	var srcPath = filepath.Join(GetImageDir(img.Id), img.Filename)
+	var srcLinkPath = filepath.Join(GetImageDir(img.Id), "src")
 
-	err = ioutil.WriteFile(srcPath, srcData, 0777)
+    imgBytes, err := ioutil.ReadAll(file)
+    if err != nil {
+        http.Error(w, err.Error(), 500)
+        return
+    }
+	err = ioutil.WriteFile(srcPath, imgBytes, 0644)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -274,15 +282,17 @@ func new(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := IndexedImage{
-		Name: filename,
-		Id:   imageId,
+	indexedImage := IndexedImage{
+		Name: img.Name(),
+		Id:   img.Id,
 	}
-	SearchEngine.Insert(filename, imageId, data)
+	SearchEngine.Insert(img.Name(), img.Id, indexedImage)
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	fmt.Fprintf(w, "{\"id\":\"%s\"}", imageId)
+    data, _ := json.Marshal(img.Serialized())
+    w.WriteHeader(201)
+    w.Write(data)
+    return
 }
 
 func cropper(w http.ResponseWriter, r *http.Request) {
