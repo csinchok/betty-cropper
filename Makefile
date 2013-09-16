@@ -23,6 +23,10 @@ build:
 	@echo "\x1b[31;1mBuilding...\x1b[0m"
 	go build
 
+link:
+	cd testroot/1/ && ln -s Lenna.png src
+	cd testroot/1234/5123 && ln -s Lenna.png src
+
 fulltests:
 	@echo "\x1b[31;1mTesting...\x1b[0m"
 	go test
@@ -30,7 +34,7 @@ fulltests:
 shorttests:
 	go test --short
 
-test: reqs bindata fulltests clean
+test: reqs bindata link fulltests clean
 
 clean:
 	@echo "\x1b[31;1mCleaning...\x1b[0m"
