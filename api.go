@@ -246,7 +246,7 @@ func new(w http.ResponseWriter, r *http.Request) {
     }
 
     // The previous read went to the end of the file, so let's go to the start again.
-    _, err := file.Seek(0, 0)
+    _, err = file.Seek(0, 0)
     if err != nil {
         http.Error(w, err.Error(), 500)
         return
