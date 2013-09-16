@@ -238,6 +238,21 @@ func new(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "POST error", 500)
 		return
 	}
+
+    imgBytes, err := ioutil.ReadAll(file)
+    if err != nil {
+        http.Error(w, err.Error(), 500)
+        return
+    }
+
+    // The previous read went to the end of the file, so let's go to the start again.
+    _, err := file.Seek(0, 0)
+    if err != nil {
+        http.Error(w, err.Error(), 500)
+        return
+    }
+
+    // Make sure this is a valid image.
     imgData, _, err := image.Decode(file)
     if err != nil {
         http.Error(w, "File error", 500)
@@ -266,11 +281,6 @@ func new(w http.ResponseWriter, r *http.Request) {
 	var srcPath = filepath.Join(GetImageDir(img.Id), img.Filename)
 	var srcLinkPath = filepath.Join(GetImageDir(img.Id), "src")
 
-    imgBytes, err := ioutil.ReadAll(file)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
 	err = ioutil.WriteFile(srcPath, imgBytes, 0644)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
