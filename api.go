@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+    "errors"
 
 	"encoding/json"
 	"html/template"
@@ -31,6 +32,10 @@ func buildIndex() {
     var datums = make([]interface{}, 0)
     var count = 0
     filepath.Walk(imageRoot, func(path string, info os.FileInfo, err error) error {
+        if count > 10000 {
+            return errors.New("Ferret can't handle that many images, please use ES.")
+        }
+
         if filepath.Base(path) == "src" {
             dir, err := filepath.Rel(imageRoot, filepath.Dir(path))
             if err != nil {
@@ -53,6 +58,7 @@ func buildIndex() {
                 log.Printf("Crawled %d items...", count)
             }
 
+
             id, err := strconv.Atoi(data.Id)
             if err == nil && id >= nextId {
                 nextId = id + 1
@@ -60,6 +66,7 @@ func buildIndex() {
         }
         return nil
     })
+    log.Println("Indexing finished!")
     SearchEngine = ferret.New(names, ids, datums, ferret.UnicodeToLowerASCII)
 }
 
