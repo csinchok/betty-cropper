@@ -24,7 +24,7 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-var BETTY_VERSION = "1.2.1"
+var BETTY_VERSION = "1.2.2"
 
 var (
 	version        = flag.Bool("version", false, "Print the version number and exit")

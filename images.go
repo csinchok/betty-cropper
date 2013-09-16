@@ -172,7 +172,7 @@ func (img *BettyImage) SetSelection(ratioString string, selection image.Rectangl
     }
 
     // Cache it
-    c.Set(img.Id, img, 0)
+    c.Set(img.Id, *img, 0)
 
     return nil
 }
@@ -206,7 +206,7 @@ func (img *BettyImage) SetName(filename string) error {
     }
 
     img.Filename = newName  // Update the object
-    c.Set(img.Id, img, 0) // Cache it
+    c.Set(img.Id, *img, 0) // Cache it
     return nil
 }
 
@@ -224,7 +224,7 @@ func (img *BettyImage) SetCredit(credit string) error {
     }
 
     img.Credit = credit  // Update the object
-    c.Set(img.Id, img, 0) // Cache it
+    c.Set(img.Id, *img, 0) // Cache it
     return nil
 }
 
