@@ -227,21 +227,27 @@ func (img *BettyImage) SetCredit(credit string) error {
     c.Set(img.Id, *img, 0) // Cache it
     return nil
 }
-
-type SearchResult struct {
-    Id       string  `json:"id"`
-    Name     string  `json:"name"`
-    Filename string  `json:"filename"`
-    Credit   string  `json:"credit,omitempty"`
-    Size     string  `json:"size"`
+type ImageSize struct {
+    Width    int  `json:"width"`
+    Height   int  `json:"height"`
 }
+type SearchResult struct {
+    Id         string                     `json:"id"`
+    Name       string                     `json:"name"`
+    Filename   string                     `json:"filename"`
+    Credit     string                     `json:"credit,omitempty"`
+    Size       ImageSize                  `json:"size"`
+    Selections map[string]image.Rectangle `json:"selections"`
+}
+
 func (img BettyImage) Serialized() SearchResult {
     return SearchResult{
         Id: img.Id,
         Credit: img.Credit,
         Filename: img.Filename,
         Name: img.Name(),
-        Size: fmt.Sprintf("%dx%d", img.Size.X, img.Size.Y),
+        Size: ImageSize{Width: img.Size.X, Height: img.Size.Y},
+        Selections: img.Selections, 
     }
 }
 
