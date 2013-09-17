@@ -241,14 +241,19 @@ type SearchResult struct {
 }
 
 func (img BettyImage) Serialized() SearchResult {
-    return SearchResult{
+    result := SearchResult{
         Id: img.Id,
         Credit: img.Credit,
         Filename: img.Filename,
         Name: img.Name(),
         Size: ImageSize{Width: img.Size.X, Height: img.Size.Y},
-        Selections: img.Selections, 
+        Selections: make(map[string]image.Rectangle),
     }
+    for _, ratio := range ratios {
+        ratioString := fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
+        result.Selections[ratioString] = img.Selection(ratioString)
+    }
+    return result
 }
 
 // The Betty request struct holds information about a crop
