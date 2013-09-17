@@ -303,7 +303,7 @@ func new(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	err = os.Symlink(srcPath, srcLinkPath)
+	err = os.Symlink(img.Filename, srcLinkPath)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
