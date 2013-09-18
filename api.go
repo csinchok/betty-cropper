@@ -10,7 +10,6 @@ import (
     "errors"
 
 	"encoding/json"
-	"html/template"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -320,63 +319,4 @@ func new(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(201)
     w.Write(data)
     return
-}
-
-func cropper(w http.ResponseWriter, r *http.Request) {
-	var imageId = strings.Split(r.URL.Path, "/")[2]
-	img, err := GetBettyImage(imageId)
-	if err != nil {
-		http.Error(w, "Couldn't find that", 404)
-        return
-	}
-
-	var imageScale = 600.0 / float64(img.Size.X)
-
-	var selections = make([]image.Rectangle, len(ratios))
-
-	for i, ratio := range ratios {
-		ratioString := fmt.Sprintf("%dx%d", ratio.X, ratio.Y)
-		selections[i] = img.Selection(ratioString)
-	}
-
-	var scaledSize = image.Pt(600, int(600.0*float64(img.Size.Y)/float64(img.Size.X)))
-
-	t := template.New("cropper.html")
-	t.Parse(string(html_cropper_html()))
-	t.Execute(w, map[string]interface{}{
-		"ImageId":       imageId,
-		"Ratios":        ratios,
-		"Selections":    selections,
-		"ScaledSize":    scaledSize,
-		"ImageScale":    imageScale,
-		"PublicAddress": publicAddress,
-	})
-}
-
-func js(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/cropper/js/jquery.color.js" {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(js_jquery_color_js())
-		return
-	}
-	if r.URL.Path == "/cropper/js/jquery.Jcrop.min.js" {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(js_jquery_jcrop_min_js())
-		return
-	}
-	http.Error(w, "Couldn't find that.", 404)
-}
-
-func css(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/cropper/css/Jcrop.gif" {
-		w.Header().Set("Content-Type", "image/gif")
-		w.Write(css_jcrop_gif())
-		return
-	}
-	if r.URL.Path == "/cropper/css/jquery.Jcrop.min.css" {
-		w.Header().Set("Content-Type", "text/css")
-		w.Write(css_jquery_jcrop_min_css())
-		return
-	}
-	http.Error(w, "Couldn't find that.", 404)
 }

@@ -116,6 +116,26 @@ func (img BettyImage) Name() string {
 	return strings.Replace(imageName, "_", " ", -1)
 }
 
+func (img BettyImage) Dir() string {
+    return GetImageDir(img.Id)
+}
+
+func clearCrop(imageId string, ratio string) {
+    ratioDir := filepath.Join(GetImageDir(imageId), ratio)
+    f, err := os.Open(ratioDir)
+    if err != nil {
+        return
+    }
+    list, err := f.Readdir(-1)
+    f.Close()
+    if err != nil {
+        return
+    }
+    for _,crop := range list {
+        os.Remove(filepath.Join(ratioDir, crop.Name()))
+    }
+}
+
 // Given a ratio string, get the selection that we'll be cropping to, either
 // from the selections.json file, or just from the middle of the iamge.
 func (img BettyImage) Selection(ratioString string) image.Rectangle {
@@ -173,6 +193,8 @@ func (img *BettyImage) SetSelection(ratioString string, selection image.Rectangl
 
     // Cache it
     c.Set(img.Id, *img, 0)
+
+    go clearCrop(img.Id, ratioString)
 
     return nil
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/pmylund/go-cache"
 )
 
-var BETTY_VERSION = "1.2.9"
+var BETTY_VERSION = "1.3.0"
 
 var (
 	version        = flag.Bool("version", false, "Print the version number and exit")
@@ -222,9 +222,6 @@ func main() {
 	loadConfig()
 	go buildIndex()
 
-	http.HandleFunc("/cropper/js/", js)
-	http.HandleFunc("/cropper/css/", css)
-	http.HandleFunc("/cropper/", cropper)
 	http.HandleFunc("/api/new", new)
 	http.HandleFunc("/api/search", search)
 	http.HandleFunc("/api/", api)
