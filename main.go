@@ -1,27 +1,22 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"image"
-	"image/jpeg"
-	"image/png"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/disintegration/imaging"
 	"github.com/pmylund/go-cache"
+    "github.com/gographics/imagick/imagick"
 )
 
 var BETTY_VERSION = "1.3.0"
@@ -33,7 +28,6 @@ var (
 	listen         = ":8698"
 	publicAddress  = "http://localhost:8698"
 	debug          = false
-	imgmin         = false
 	ratios         []image.Point
 	nextId         = 1
 	adminReady     = false
@@ -52,13 +46,6 @@ func loadConfig() {
 	if err != nil {
 		log.Printf("\"%s\" is a bad path for a config file, exiting.\n", *configPath)
 		os.Exit(1)
-	}
-
-	_, err = exec.LookPath("imgmin")
-	if err != nil {
-		log.Println("Couldn't find imgmin in the $PATH, compression won't be as effective.")
-	} else {
-		imgmin = false
 	}
 
 	type Config struct {
@@ -91,44 +78,8 @@ func loadConfig() {
 	}
 }
 
-func cp(src, dst string) error {
-	s, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	// no need to check errors on read only file, we already got everything
-	// we need from the filesystem, so nothing can go wrong now.
-	defer s.Close()
-	d, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(d, s); err != nil {
-		d.Close()
-		return err
-	}
-	return d.Close()
-}
-
-func minify(src, dst string) {
-	cmd := exec.Command("imgmin", src, dst)
-	var out bytes.Buffer
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		log.Println(err)
-		log.Println(out.String())
-
-		err = cp(src, dst)
-		if err == nil {
-			log.Println(err)
-			return
-		}
-	}
-	os.Remove(src)
-}
-
 func crop(w http.ResponseWriter, r *http.Request) {
+
 	if r.Method != "GET" {
 		http.Error(w, "GET only, you asshole.", 405)
 		return
@@ -143,8 +94,6 @@ func crop(w http.ResponseWriter, r *http.Request) {
             http.Redirect(w, r, location, 301)
             return
         }
-        
-
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -171,13 +120,31 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 	var selection = img.Selection(imageReq.RatioString)
 
-	src, err := img.Open()
-	if err != nil {
-		http.Error(w, "Couldn't find that.", 404)
-		return
-	}
-	var dst = imaging.Crop(src, selection)
-	dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
+    imagick.Initialize()
+    defer imagick.Terminate()
+    mw := imagick.NewMagickWand()
+    defer mw.Destroy()
+
+    // Read the image
+    err = mw.ReadImage(filepath.Join(GetImageDir(img.Id), "src"))
+    if err != nil {
+        http.Error(w, "Couldn't find that.", 404)
+    }
+
+    // Crop to selection
+    width := uint(selection.Max.X - selection.Min.X)
+    height := uint(selection.Max.Y - selection.Min.Y)
+    mw.CropImage(width, height, selection.Min.X, selection.Min.Y)
+    err = mw.ResizeImage(uint(imageReq.Width), uint(imageReq.Height()), imagick.FILTER_LANCZOS, 1)
+
+
+	// src, err := img.Open()
+	// if err != nil {
+	// 	http.Error(w, "Couldn't find that.", 404)
+	// 	return
+	// }
+	// var dst = imaging.Crop(src, selection)
+	// dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
 
 	err = os.MkdirAll(filepath.Dir(imageReq.Path()), 0755)
 	if err != nil {
@@ -185,35 +152,25 @@ func crop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	croppedPath := imageReq.Path()
-	if imgmin {
-		croppedPath = croppedPath + ".preopt"
-	}
-
-	outputWriter, err := os.Create(croppedPath)
+	outputFile, err := os.Create(imageReq.Path())
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
 	if imageReq.Format == "jpg" {
+        mw.SetImageFormat("JPEG")
 		w.Header().Set("Content-Type", "image/jpeg")
-		jpeg.Encode(w, dst, &jpeg.Options{75})
-		if imgmin {
-			jpeg.Encode(outputWriter, dst, &jpeg.Options{100})
-		} else {
-			jpeg.Encode(outputWriter, dst, &jpeg.Options{80})
-		}
 	}
 	if imageReq.Format == "png" {
+        mw.SetImageFormat("PNG")
 		w.Header().Set("Content-Type", "image/png")
-		png.Encode(w, dst)
-		png.Encode(outputWriter, dst)
 	}
+    imageBytes := mw.GetImageBlob()
+    w.Write(imageBytes)
+    outputFile.Write(imageBytes)
 
-	if imgmin {
-		go minify(croppedPath, filepath.Join(imageRoot, imageReq.Path()))
-	}
+    return
 }
 
 func main() {

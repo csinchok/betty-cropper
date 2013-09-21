@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/disintegration/imaging"
 	"image"
 	"io/ioutil"
 	"math"
@@ -14,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+    "github.com/gographics/imagick/imagick"
 )
 
 // The regex that validates and parses incoming image requests.
@@ -76,12 +77,17 @@ func GetBettyImage(imageId string) (BettyImage, error) {
 		Filename: filepath.Base(dstPath),
 	}
 
-	// Load up the original, get the size.
-	src, err := imaging.Open(filepath.Join(imageDir, "src"))
-	if err != nil {
-		return BettyImage{}, err
-	}
-	img.Size = src.Bounds().Max
+    imagick.Initialize()
+    mw := imagick.NewMagickWand()
+
+    // Load up the original, get the size.
+    err = mw.ReadImage(filepath.Join(imageDir, "src"))
+    if err != nil {
+        return BettyImage{}, err
+    }
+    img.Size = image.Pt(int(mw.GetImageWidth()), int(mw.GetImageHeight()))
+    mw.Destroy()
+    imagick.Terminate()
 
 	// Look for a credit.txt, store that info if it exists.
 	creditPath := filepath.Join(imageDir, "credit.txt")
@@ -103,11 +109,6 @@ func GetBettyImage(imageId string) (BettyImage, error) {
 	// Put this image into the cache, and return
 	c.Set(imageId, img, 0)
 	return img, nil
-}
-
-// Open the original image, and return a image.Image object.
-func (img BettyImage) Open() (image.Image, error) {
-	return imaging.Open(filepath.Join(GetImageDir(img.Id), "src"))
 }
 
 // Get a human readable name for the image, taken from the filename.
@@ -298,10 +299,13 @@ func (r BettyRequest) Path() string {
 	return filepath.Join(GetImageDir(r.Id), r.RatioString, filename)
 }
 
+func (r BettyRequest) Height() int {
+    return int(math.Floor(float64(r.Width) * float64(r.Ratio().Y) / float64(r.Ratio().X)))
+}
+
 // Get the size of the output image
 func (r BettyRequest) Size() image.Rectangle {
-	var height = int(math.Floor(float64(r.Width) * float64(r.Ratio().Y) / float64(r.Ratio().X)))
-	return image.Rect(0, 0, r.Width, height)
+	return image.Rect(0, 0, r.Width, r.Height())
 }
 
 // Represent the image ratio as an image.Point.
