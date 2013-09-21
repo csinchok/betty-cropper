@@ -6,7 +6,7 @@ go:
   - tip
 
 install:
-  - sudo apt-get install imagemagick libmagickwand-dev -qq -y
+  - sudo apt-get install libmagickwand-dev -qq -y
   - make reqs
   - make bindata
   - make testenv
