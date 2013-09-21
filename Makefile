@@ -1,6 +1,4 @@
 export GOPATH=$(realpath $(dir $(lastword $(MAKEFILE_LIST))))
-export CGO_CFLAGS="-I`pkg-config --cflags MagickWand`"
-export CGO_LDFLAGS="-I`pkg-config --libs MagickWand`"
 
 all: reqs bindata build clean
 
