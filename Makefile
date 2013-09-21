@@ -8,7 +8,7 @@ reqs:
 	go get code.google.com/p/freetype-go/freetype
 	go get github.com/pmylund/go-cache
 	go get github.com/jteeuwen/go-bindata
-	go get github.com/gographics/imagick/imagick
+	go get github.com/rafikk/imagick/imagick
 
 bindata:
 	@echo "\x1b[31;1mConverting static resources to golang...\x1b[0m"
