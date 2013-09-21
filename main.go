@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pmylund/go-cache"
-    "github.com/gographics/imagick/imagick"
+    "github.com/rafikk/imagick/imagick"
 )
 
 var BETTY_VERSION = "1.3.0"

@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-    "github.com/gographics/imagick/imagick"
+    "github.com/rafikk/imagick/imagick"
 )
 
 // The regex that validates and parses incoming image requests.
