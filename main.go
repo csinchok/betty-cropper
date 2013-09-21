@@ -137,15 +137,6 @@ func crop(w http.ResponseWriter, r *http.Request) {
     mw.CropImage(width, height, selection.Min.X, selection.Min.Y)
     err = mw.ResizeImage(uint(imageReq.Width), uint(imageReq.Height()), imagick.FILTER_LANCZOS, 1)
 
-
-	// src, err := img.Open()
-	// if err != nil {
-	// 	http.Error(w, "Couldn't find that.", 404)
-	// 	return
-	// }
-	// var dst = imaging.Crop(src, selection)
-	// dst = imaging.Resize(dst, imageReq.Width, 0, imaging.CatmullRom)
-
 	err = os.MkdirAll(filepath.Dir(imageReq.Path()), 0755)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
