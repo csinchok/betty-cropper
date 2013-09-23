@@ -9,6 +9,7 @@ reqs:
 	go get github.com/pmylund/go-cache
 	go get github.com/jteeuwen/go-bindata
 	go get github.com/rafikk/imagick/imagick
+	go get github.com/csinchok/imgmin-go
 
 bindata:
 	@echo "\x1b[31;1mConverting static resources to golang...\x1b[0m"
@@ -29,11 +30,16 @@ fulltests:
 	@echo "\x1b[31;1mTesting...\x1b[0m"
 	go test
 
+runbench:
+	go test -bench=CroppingJPEG
+
 shorttests:
 	go test --short
 
-test: reqs bindata fulltests clean testenv
+test: reqs clean testenv bindata fulltests clean testenv
 
 clean:
 	@echo "\x1b[31;1mCleaning...\x1b[0m"
 	rm -f ./bindata_*.go
+
+bench: reqs clean testenv bindata runbench clean testenv

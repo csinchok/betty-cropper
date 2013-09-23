@@ -1,11 +1,15 @@
 package main
 
 import (
+    "fmt"
+    // "log"
     "image"
+    "io/ioutil"
+    "os"
 	"path/filepath"
 	"testing"
-	// "net/http/httptest"
-	// "net/http"
+	"net/http/httptest"
+	"net/http"
 )
 
 func TestIdParsing(t *testing.T) {
@@ -184,5 +188,51 @@ func TestSetters(t *testing.T) {
     }
     if img.Credit != "Farty McFarter" {
         t.Errorf("Credit should be 'Farty McFarter', but we got '%s'", img.Credit)
+    }
+}
+
+func TestCropping(t *testing.T) {
+
+    imageRoot, _ = filepath.Abs("testroot")
+    debug = false
+
+    server := httptest.NewServer(http.HandlerFunc(crop))
+
+    uri := "/1/16x9/200.jpg"
+    resp, err := http.Get(server.URL + uri)
+    if err != nil {
+        t.Error(err.Error())
+    }
+
+    if _, err := ioutil.ReadAll(resp.Body); err != nil {
+        t.Fail()
+    } else {
+        _, err := os.Stat(filepath.Join(imageRoot, "/1/16x9/200.jpg"))
+        if err != nil && os.IsNotExist(err) {
+            t.Error("Didn't create crop")
+        }
+    }
+}
+
+func BenchmarkCroppingJPEG(b *testing.B) {
+
+    ratioStrings := []string{"1x1", "2x1", "3x1", "3x4", "4x3", "16x9"}
+    imageRoot, _ = filepath.Abs("testroot")
+    debug = false
+
+    server := httptest.NewServer(http.HandlerFunc(crop))
+
+    for i := 0; i < b.N; i++ {
+        ratio := ratioStrings[i % len(ratioStrings)]
+        uri := fmt.Sprintf("/1/%s/%d.jpg", ratio, 100 + (i % 2000))
+        resp, err := http.Get(server.URL + uri)
+        if err != nil {
+            b.Error(err.Error())
+        }
+        _ = resp
+        //  _ = resp.Body
+        // if err != nil {
+        //     log.Println(err.Error())
+        // }
     }
 }

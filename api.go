@@ -15,7 +15,8 @@ import (
 	"path/filepath"
 
 	"github.com/argusdusty/Ferret"
-	// "github.com/disintegration/imaging"
+    "github.com/rafikk/imagick/imagick"
+    // "github.com/csinchok/imgmin-go"
 )
 
 var SearchEngine *ferret.InvertedSuffix
@@ -23,6 +24,10 @@ var SearchEngine *ferret.InvertedSuffix
 type IndexedImage struct {
     Id      string
 	Name    string
+}
+
+func searchQuality(imageId string) {
+    
 }
 
 func buildIndex() {
@@ -261,15 +266,14 @@ func new(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // The previous read went to the end of the file, so let's go to the start again.
-    _, err = file.Seek(0, 0)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
+    // Initialize a wand
+    imagick.Initialize()
+    defer imagick.Terminate()
+    mw := imagick.NewMagickWand()
+    defer mw.Destroy()
 
     // Make sure this is a valid image.
-    imgData, _, err := image.Decode(file)
+    err = mw.ReadImageBlob(imgBytes)
     if err != nil {
         http.Error(w, "File error", 500)
         return
@@ -283,7 +287,7 @@ func new(w http.ResponseWriter, r *http.Request) {
     img := BettyImage{
         Id: strconv.Itoa(nextId),
         Filename: cleanImageName(filename),
-        Size: imgData.Bounds().Max,
+        Size: image.Pt(int(mw.GetImageWidth()), int(mw.GetImageHeight())),
     }
 
     nextId += 1  // TODO: Add mutex here?
