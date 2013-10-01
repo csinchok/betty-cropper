@@ -14,6 +14,7 @@ import (
 
 func TestIdParsing(t *testing.T) {
     config.ImageRoot = "/var/betty-cropper"
+    config.ImgminEnabled = false
 	var request = BettyRequest{
 		Id:          "123",
 		RatioString: "original",
@@ -48,6 +49,7 @@ func TestIdParsing(t *testing.T) {
 func TestRequestParsing(t *testing.T) {
 	// Test a standard request
 	imageRequest, err := ParseBettyRequest("/1234/16x9/600.jpg")
+    config.ImgminEnabled = false
 	if err != nil {
 		t.Errorf("Request parsing error: %s", err)
 	}
@@ -107,6 +109,7 @@ func TestRequestParsing(t *testing.T) {
 func TestBettyImage(t *testing.T) {
 	config.ImageRoot, _ = filepath.Abs("testroot")
 	config.PlaceholderEnabled = false
+    config.ImgminEnabled = false
 
 	// Test with a short id
 	img, err := GetBettyImage("1")
@@ -139,6 +142,7 @@ func TestBettyImage(t *testing.T) {
 func TestIndexing(t *testing.T) {
     config.ImageRoot, _ = filepath.Abs("testroot")
     config.PlaceholderEnabled = false
+    config.ImgminEnabled = false
 
     buildIndex()
 
@@ -163,6 +167,7 @@ func TestIndexing(t *testing.T) {
 }
 
 func TestSetters(t *testing.T) {
+    config.ImgminEnabled = false
     img, err := GetBettyImage("1")
     if err != nil {
         t.Errorf("Error getting image info: %s", err.Error())
@@ -193,9 +198,9 @@ func TestSetters(t *testing.T) {
 }
 
 func TestCropping(t *testing.T) {
-
     config.ImageRoot, _ = filepath.Abs("testroot")
     config.PlaceholderEnabled = false
+    config.ImgminEnabled = false
 
     server := httptest.NewServer(http.HandlerFunc(crop))
 
@@ -220,6 +225,7 @@ func BenchmarkCroppingJPEG(b *testing.B) {
     ratioStrings := []string{"1x1", "2x1", "3x1", "3x4", "4x3", "16x9"}
     config.ImageRoot, _ = filepath.Abs("testroot")
     config.PlaceholderEnabled = false
+    config.ImgminEnabled = false
 
     server := httptest.NewServer(http.HandlerFunc(crop))
 

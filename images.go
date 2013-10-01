@@ -135,7 +135,6 @@ func (img BettyImage) Dir() string {
 
 func findOptimalQuality(imageId string) {
 
-    log.Println("Searching: %s", imageId)
     imagick.Initialize()
     mw := imagick.NewMagickWand()
 

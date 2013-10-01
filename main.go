@@ -30,6 +30,7 @@ type Config struct {
     PlaceholderFont    string   `json:"placeholderFont"`     // The font used for placeholder images
     CreditFont         string   `json:"creditFont"`    // The font used fo rhte image credits
     ElasticSearch      string   `json:"elasticsearch"` // An ElasticSearch URL
+    ImgminEnabled      bool     `json:"imgminEnabled`  // imgmin emabled
 }
 
 var (
