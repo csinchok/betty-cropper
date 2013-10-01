@@ -35,13 +35,13 @@ func buildIndex() {
     var names = make([]string, 0)
     var datums = make([]interface{}, 0)
     var count = 0
-    filepath.Walk(imageRoot, func(path string, info os.FileInfo, err error) error {
+    filepath.Walk(config.ImageRoot, func(path string, info os.FileInfo, err error) error {
         if count > 10000 {
             return errors.New("Ferret can't handle that many images, please use ES.")
         }
 
         if filepath.Base(path) == "src" {
-            dir, err := filepath.Rel(imageRoot, filepath.Dir(path))
+            dir, err := filepath.Rel(config.ImageRoot, filepath.Dir(path))
             if err != nil {
                 return err
             }

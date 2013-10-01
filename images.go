@@ -33,7 +33,7 @@ type BettyImage struct {
 // images, we need to split things into subdirectories. This function
 // gives us the base directory for a given image id.
 func GetImageDir(imageId string) string {
-	return filepath.Join(imageRoot, GetRelImageDir(imageId))
+	return filepath.Join(config.ImageRoot, GetRelImageDir(imageId))
 }
 
 func cleanImageName(s string) string {
@@ -311,7 +311,13 @@ func (r BettyRequest) Size() image.Rectangle {
 // Represent the image ratio as an image.Point.
 func (r BettyRequest) Ratio() image.Point {
 	if r.RatioString == "original" {
-		return image.Point{}
+        img, err := r.Image()
+        if err == nil {
+            return img.Size
+        } else {
+            return image.Point{}
+        }
+		
 	}
 	var w, _ = strconv.Atoi(strings.Split(r.RatioString, "x")[0])
 	var h, _ = strconv.Atoi(strings.Split(r.RatioString, "x")[1])

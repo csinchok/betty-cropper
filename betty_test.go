@@ -13,6 +13,7 @@ import (
 )
 
 func TestIdParsing(t *testing.T) {
+    config.ImageRoot = "/var/betty-cropper"
 	var request = BettyRequest{
 		Id:          "123",
 		RatioString: "original",
@@ -104,8 +105,8 @@ func TestRequestParsing(t *testing.T) {
 }
 
 func TestBettyImage(t *testing.T) {
-	imageRoot, _ = filepath.Abs("testroot")
-	debug = false
+	config.ImageRoot, _ = filepath.Abs("testroot")
+	config.PlaceholderEnabled = false
 
 	// Test with a short id
 	img, err := GetBettyImage("1")
@@ -136,8 +137,8 @@ func TestBettyImage(t *testing.T) {
 }
 
 func TestIndexing(t *testing.T) {
-    imageRoot, _ = filepath.Abs("testroot")
-    debug = false
+    config.ImageRoot, _ = filepath.Abs("testroot")
+    config.PlaceholderEnabled = false
 
     buildIndex()
 
@@ -193,8 +194,8 @@ func TestSetters(t *testing.T) {
 
 func TestCropping(t *testing.T) {
 
-    imageRoot, _ = filepath.Abs("testroot")
-    debug = false
+    config.ImageRoot, _ = filepath.Abs("testroot")
+    config.PlaceholderEnabled = false
 
     server := httptest.NewServer(http.HandlerFunc(crop))
 
@@ -207,7 +208,7 @@ func TestCropping(t *testing.T) {
     if _, err := ioutil.ReadAll(resp.Body); err != nil {
         t.Fail()
     } else {
-        _, err := os.Stat(filepath.Join(imageRoot, "/1/16x9/200.jpg"))
+        _, err := os.Stat(filepath.Join(config.ImageRoot, "/1/16x9/200.jpg"))
         if err != nil && os.IsNotExist(err) {
             t.Error("Didn't create crop")
         }
@@ -217,8 +218,8 @@ func TestCropping(t *testing.T) {
 func BenchmarkCroppingJPEG(b *testing.B) {
 
     ratioStrings := []string{"1x1", "2x1", "3x1", "3x4", "4x3", "16x9"}
-    imageRoot, _ = filepath.Abs("testroot")
-    debug = false
+    config.ImageRoot, _ = filepath.Abs("testroot")
+    config.PlaceholderEnabled = false
 
     server := httptest.NewServer(http.HandlerFunc(crop))
 

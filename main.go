@@ -21,17 +21,23 @@ import (
 
 var BETTY_VERSION = "1.3.0"
 
+type Config struct {
+    ImageRoot          string   `json:"imageRoot"`     // Where we put out images
+    Listen             string   `json:"listen"`        // The address that Betty listens on
+    PublicAddress      string   `json:"publicAddress"` // The address that the public interface is served from
+    Ratios             []string `json:"ratios"`        // A list of image ratios that we'll be cropping for
+    PlaceholderEnabled bool     `json:"placeholderEnabled"`         // If debug is true or false
+    PlaceholderFont    string   `json:"placeholderFont"`     // The font used for placeholder images
+    CreditFont         string   `json:"creditFont"`    // The font used fo rhte image credits
+}
+
 var (
 	version        = flag.Bool("version", false, "Print the version number and exit")
 	configPath     = flag.String("config", "config.json", "Path for the config file")
-	imageRoot      = "/var/betty-cropper"
-	listen         = ":8698"
-	publicAddress  = "http://localhost:8698"
-	debug          = false
 	ratios         []image.Point
 	nextId         = 1
-	adminReady     = false
 	c              = cache.New(15*time.Minute, 30*time.Second)
+    config         = Config{}
     redirectRegexp = regexp.MustCompile("^/([0-9]{5,})/((?:[0-9]+x[0-9]+)|original)/([0-9]+).(jpg|png)$")
 )
 
@@ -48,26 +54,35 @@ func loadConfig() {
 		os.Exit(1)
 	}
 
-	type Config struct {
-		ImageRoot     string   `json:"imageRoot"`     // Where we put out images
-		Listen        string   `json:"listen"`        // The address that Betty listens on
-		PublicAddress string   `json:"publicAddress"` // The address that the public interface is served from
-		Ratios        []string `json:"ratios"`        // A list of image ratios that we'll be cropping for
-		Debug         bool     `json:"debug"`         // If debug is true or false
-	}
-
-	var config Config
 	configBytes, err := ioutil.ReadFile(absConfigPath)
 	if err != nil {
 		log.Printf("Can't read the config file, because \"%s\", exiting.\n", err)
 		os.Exit(1)
 	}
 	json.Unmarshal(configBytes, &config)
-	listen = config.Listen
-	publicAddress = config.PublicAddress
-	imageRoot = config.ImageRoot
 
-	debug = config.Debug
+    if config.Listen == "" {
+        config.Listen = ":8698"
+    }
+
+    if config.PublicAddress == "" {
+        config.Listen = "http://localhost:8698"
+    }
+
+    if config.ImageRoot == "" {
+        config.ImageRoot = "/var/betty-cropper"
+    }
+
+    // TODO: Could this even ever be nil?
+    config.PlaceholderEnabled = true
+
+    if config.PlaceholderFont == "" {
+        config.PlaceholderFont = "Courier-New"
+    }
+
+    if config.CreditFont == "" {
+        config.CreditFont = "Courier-New"
+    }
 
 	ratios = make([]image.Point, len(config.Ratios))
 	// ratios = [config.Ratios.len()]image.Point
@@ -90,7 +105,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
         re := *redirectRegexp
         var submatches = re.FindStringSubmatch(r.URL.Path)
         if submatches != nil {
-            var location = fmt.Sprintf("%s/%s/%s/%s.%s", publicAddress, GetRelImageDir(submatches[1]), submatches[2], submatches[3], submatches[4])
+            var location = fmt.Sprintf("%s/%s/%s/%s.%s", config.PublicAddress, GetRelImageDir(submatches[1]), submatches[2], submatches[3], submatches[4])
             http.Redirect(w, r, location, 301)
             return
         }
@@ -110,7 +125,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
 	img, err := imageReq.Image()
 	if err != nil {
-		if debug {
+		if config.PlaceholderEnabled {
 			placeholder(w, imageReq)
 			return
 		} else {
@@ -136,6 +151,38 @@ func crop(w http.ResponseWriter, r *http.Request) {
     height := uint(selection.Max.Y - selection.Min.Y)
     mw.CropImage(width, height, selection.Min.X, selection.Min.Y)
     err = mw.ResizeImage(uint(imageReq.Width), uint(imageReq.Height()), imagick.FILTER_LANCZOS, 1)
+    if err != nil {
+        log.Println(err)
+    }
+
+    if img.Credit != ""  && imageReq.Width > 250 {
+        // TODO: Also check image width?
+        dw := imagick.NewDrawingWand()
+
+        dw.SetFont(config.PlaceholderFont)
+        dw.SetFontSize(12)
+
+        pw := imagick.NewPixelWand()
+        pw.SetColor("#FFFFFF")
+        dw.SetFillColor(pw)
+        pw.Destroy()
+
+        fontMetrics := mw.QueryFontMetrics(dw, img.Credit)
+
+        scale := float64(imageReq.Width) / float64(width)
+        // log.Printf("DY: %d", imageReq.Height() + selection.Min.Y - 10)
+        dy := (float64(selection.Max.Y) * scale) - 10
+        dx := (float64(selection.Max.X) * scale) - fontMetrics.TextWidth - 10
+        err = mw.AnnotateImage(dw, dx, dy, 0, img.Credit)
+        if err != nil {
+            log.Println(err)
+        }
+        err = mw.DrawImage(dw)
+        if err != nil {
+            log.Println(err)
+        }
+        dw.Destroy()
+    }
 
 	err = os.MkdirAll(filepath.Dir(imageReq.Path()), 0755)
 	if err != nil {
@@ -174,6 +221,5 @@ func main() {
 	http.HandleFunc("/api/search", search)
 	http.HandleFunc("/api/", api)
 	http.HandleFunc("/", crop)
-	http.ListenAndServe(listen, nil)
-	adminReady = true
+	http.ListenAndServe(config.Listen, nil)
 }

@@ -9,5 +9,7 @@
 		"4x3",
 		"16x9"
 	],
-	"debug": true
+	"debug": true,
+    "debugFont": "Times-New-Roman",
+    "creditFont": "Times-New-Roman"
 }
