@@ -105,7 +105,9 @@ func GetBettyImage(imageId string) (BettyImage, error) {
         img.MinQuality, _ = strconv.Atoi(string(qualityBytes))
     } else {
         img.MinQuality = 75
-        go findOptimalQuality(img.Id)
+        if config.ImgminEnabled {
+            go findOptimalQuality(img.Id)
+        }
     }
 
 	// Look for the selections.json file, store that info if it exists.
