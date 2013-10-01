@@ -29,6 +29,7 @@ type Config struct {
     PlaceholderEnabled bool     `json:"placeholderEnabled"`         // If debug is true or false
     PlaceholderFont    string   `json:"placeholderFont"`     // The font used for placeholder images
     CreditFont         string   `json:"creditFont"`    // The font used fo rhte image credits
+    ElasticSearch      string   `json:"elasticsearch"` // An ElasticSearch URL
 }
 
 var (
@@ -197,11 +198,12 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if imageReq.Format == "jpg" {
-        mw.SetImageFormat("JPEG")
+        mw.SetImageFormat("jpeg")
+        mw.SetImageCompressionQuality(uint(img.MinQuality))
 		w.Header().Set("Content-Type", "image/jpeg")
 	}
 	if imageReq.Format == "png" {
-        mw.SetImageFormat("PNG")
+        mw.SetImageFormat("png")
 		w.Header().Set("Content-Type", "image/png")
 	}
     imageBytes := mw.GetImageBlob()

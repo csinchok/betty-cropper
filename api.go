@@ -16,7 +16,6 @@ import (
 
 	"github.com/argusdusty/Ferret"
     "github.com/rafikk/imagick/imagick"
-    // "github.com/csinchok/imgmin-go"
 )
 
 var SearchEngine *ferret.InvertedSuffix

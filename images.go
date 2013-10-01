@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+    "log"
 
     "github.com/rafikk/imagick/imagick"
+    "github.com/csinchok/imgmin-go"
 )
 
 // The regex that validates and parses incoming image requests.
@@ -27,6 +29,7 @@ type BettyImage struct {
 	Filename   string
 	Selections map[string]image.Rectangle
 	Size       image.Point
+    MinQuality int
 }
 
 // Because of filesystem limitations, if we have more than 9999
@@ -96,6 +99,15 @@ func GetBettyImage(imageId string) (BettyImage, error) {
 		img.Credit = string(creditBytes)
 	}
 
+    qualityPath := filepath.Join(imageDir, "quality.txt")
+    qualityBytes, err := ioutil.ReadFile(qualityPath)
+    if err == nil {
+        img.MinQuality, _ = strconv.Atoi(string(qualityBytes))
+    } else {
+        img.MinQuality = 75
+        go findOptimalQuality(img.Id)
+    }
+
 	// Look for the selections.json file, store that info if it exists.
 	var selectionsJsonPath = filepath.Join(imageDir, "selections.json")
 	// var selections map[string]image.Rectangle
@@ -119,6 +131,44 @@ func (img BettyImage) Name() string {
 
 func (img BettyImage) Dir() string {
     return GetImageDir(img.Id)
+}
+
+func findOptimalQuality(imageId string) {
+
+    log.Println("Searching: %s", imageId)
+    imagick.Initialize()
+    mw := imagick.NewMagickWand()
+
+    // Read the image
+    err := mw.ReadImage(filepath.Join(GetImageDir(imageId), "src"))
+    if err != nil {
+        log.Println(err.Error())
+        return
+    }
+
+    if mw.GetImageFormat() != "jpeg" {
+        mw.SetImageFormat("jpeg")
+        imageBytes := mw.GetImageBlob()
+        mw.ReadImageBlob(imageBytes)
+    } 
+
+    out, err := imgmin.SearchQuality(mw, imgmin.Options{})
+    if err != nil {
+        log.Println(err.Error())
+        return
+    }
+    qualityString := strconv.Itoa(int(out.GetImageCompressionQuality()))
+    
+    img, err := GetBettyImage(imageId)
+    img.MinQuality = int(out.GetImageCompressionQuality())
+    c.Set(img.Id, img, 0)
+
+    qualityPath := filepath.Join(GetImageDir(imageId), "quality.txt")
+    err = ioutil.WriteFile(qualityPath, []byte(qualityString), 0644)
+    if err != nil {
+        log.Println(err.Error())
+        return
+    }
 }
 
 func clearCrop(imageId string, ratio string) {
