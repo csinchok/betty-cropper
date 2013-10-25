@@ -19,7 +19,7 @@ import (
     "github.com/rafikk/imagick/imagick"
 )
 
-var BETTY_VERSION = "1.3.0"
+var BETTY_VERSION = "1.4.0"
 
 type Config struct {
     ImageRoot          string   `json:"imageRoot"`     // Where we put out images
