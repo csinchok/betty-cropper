@@ -6,18 +6,6 @@ import (
     "github.com/rafikk/imagick/imagick"
 )
 
-// var backgroundColors = []color.RGBA{
-// 	color.RGBA{153, 153, 51, 255},
-// 	color.RGBA{102, 153, 51, 255},
-// 	color.RGBA{51, 153, 51, 255},
-// 	color.RGBA{153, 51, 51, 255},
-// 	color.RGBA{194, 133, 71, 255},
-// 	color.RGBA{51, 153, 102, 255},
-// 	color.RGBA{153, 51, 102, 255},
-// 	color.RGBA{71, 133, 194, 255},
-// 	color.RGBA{51, 153, 153, 255},
-// 	color.RGBA{153, 51, 153, 255},
-// }
 var backgroundColors = []string{
     "rgb(153,153,51)",
     "rgb(102,153,51)",
