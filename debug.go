@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+    "math"
 
     "github.com/rafikk/imagick/imagick"
 )
@@ -28,7 +29,12 @@ func placeholder(w http.ResponseWriter, r BettyRequest) {
     mw := imagick.NewMagickWand()
     dw := imagick.NewDrawingWand()
 
-    mw.SetSize(uint(r.Size().Max.X), uint(r.Size().Max.Y))
+    if r.RatioString == "original" {
+        var height = int(math.Floor(float64(r.Width) * 9.0 / 16.0))
+        mw.SetSize(uint(r.Width), uint(height))
+    } else {
+        mw.SetSize(uint(r.Size().Max.X), uint(r.Size().Max.Y))
+    }
     dw.SetFont(config.PlaceholderFont)
     dw.SetFontSize(52)
 
