@@ -164,7 +164,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
     mw.CropImage(width, height, selection.Min.X, selection.Min.Y)
     err = mw.ResizeImage(uint(imageReq.Width), uint(imageReq.Height()), imagick.FILTER_LANCZOS, 1)
     if err != nil {
-        config.Logger.Println(err)
+        //config.Logger.Println(err)
     }
 
     if img.Credit != ""  && imageReq.Width > 250 {
@@ -187,11 +187,11 @@ func crop(w http.ResponseWriter, r *http.Request) {
         dx := (float64(selection.Max.X) * scale) - fontMetrics.TextWidth - 10
         err = mw.AnnotateImage(dw, dx, dy, 0, img.Credit)
         if err != nil {
-            config.Logger.Println(err)
+            //config.Logger.Println(err)
         }
         err = mw.DrawImage(dw)
         if err != nil {
-            config.Logger.Println(err)
+            //config.Logger.Println(err)
         }
         dw.Destroy()
     }
@@ -219,7 +219,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
 	}
     imageBytes := mw.GetImageBlob()
 
-    config.Logger.Println("Cropped: " + r.URL.Path)
+    //config.Logger.Println("Cropped: " + r.URL.Path)
     w.Write(imageBytes)
     go func() {
         outputFile.Write(imageBytes)

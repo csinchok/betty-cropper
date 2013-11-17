@@ -84,7 +84,7 @@ func GetBettyImage(imageId string) (BettyImage, error) {
     // Load up the original, get the size.
     err = mw.ReadImage(filepath.Join(imageDir, filepath.Base(dstPath)))
     if err != nil {
-        config.Logger.Println(err)
+        // config.Logger.Println(err)
         return BettyImage{}, err
     }
     img.Size = image.Pt(int(mw.GetImageWidth()), int(mw.GetImageHeight()))
@@ -142,7 +142,7 @@ func findOptimalQuality(imageId string) {
     // Read the image
     err := mw.ReadImage(filepath.Join(GetImageDir(imageId), "src"))
     if err != nil {
-        config.Logger.Println(err)
+        // config.Logger.Println(err)
         return
     }
 
@@ -154,7 +154,7 @@ func findOptimalQuality(imageId string) {
 
     out, err := imgmin.SearchQuality(mw, imgmin.Options{})
     if err != nil {
-        config.Logger.Println(err)
+        // config.Logger.Println(err)
         return
     }
     qualityString := strconv.Itoa(int(out.GetImageCompressionQuality()))
@@ -166,7 +166,7 @@ func findOptimalQuality(imageId string) {
     qualityPath := filepath.Join(GetImageDir(imageId), "quality.txt")
     err = ioutil.WriteFile(qualityPath, []byte(qualityString), 0644)
     if err != nil {
-        config.Logger.Println(err)
+        // config.Logger.Println(err)
         return
     }
 }
@@ -383,7 +383,7 @@ func ParseBettyRequest(URLPath string) (BettyRequest, error) {
 	}
 	width, err := strconv.Atoi(submatches[3])
 	if err != nil {
-        config.Logger.Print(err)
+        // config.Logger.Print(err)
 		return BettyRequest{}, err
 	}
 	var imageReq = BettyRequest{
