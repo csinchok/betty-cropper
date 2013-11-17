@@ -221,7 +221,9 @@ func crop(w http.ResponseWriter, r *http.Request) {
 
     config.Logger.Println("Cropped: " + r.URL.Path)
     w.Write(imageBytes)
-    outputFile.Write(imageBytes)
+    go func() {
+        outputFile.Write(imageBytes)
+    }()
 
     return
 }
