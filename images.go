@@ -22,7 +22,6 @@ import (
 // The regex that validates and parses incoming image requests.
 var imageRegexp = regexp.MustCompile("^(?P<image_id_path>(?:/[0-9]{1,4})+)/(?P<ratio>(?:[0-9]+x[0-9]+)|original)/(?P<width>[0-9]+).(?P<format>jpg|png)$")
 
-
 type BettyImage struct {
 	Id         string
 	Credit     string
@@ -70,7 +69,7 @@ func GetBettyImage(imageId string) (BettyImage, error) {
 	srcPath := filepath.Join(imageDir, "src")
 	dstPath, err := os.Readlink(srcPath)
 	if err != nil {
-		// If this fails, this iamge doesn't exist, so we bail.
+		// If this fails, this image doesn't exist, so we bail.
 		return BettyImage{}, err
 	}
 
@@ -84,8 +83,9 @@ func GetBettyImage(imageId string) (BettyImage, error) {
     mw := imagick.NewMagickWand()
 
     // Load up the original, get the size.
-    err = mw.ReadImage(filepath.Join(imageDir, "src"))
+    err = mw.ReadImage(filepath.Join(imageDir, filepath.Base(dstPath)))
     if err != nil {
+        log.Println(err)
         return BettyImage{}, err
     }
     img.Size = image.Pt(int(mw.GetImageWidth()), int(mw.GetImageHeight()))
@@ -143,7 +143,7 @@ func findOptimalQuality(imageId string) {
     // Read the image
     err := mw.ReadImage(filepath.Join(GetImageDir(imageId), "src"))
     if err != nil {
-        log.Println(err.Error())
+        log.Println(err)
         return
     }
 
@@ -155,7 +155,7 @@ func findOptimalQuality(imageId string) {
 
     out, err := imgmin.SearchQuality(mw, imgmin.Options{})
     if err != nil {
-        log.Println(err.Error())
+        log.Println(err)
         return
     }
     qualityString := strconv.Itoa(int(out.GetImageCompressionQuality()))
@@ -167,7 +167,7 @@ func findOptimalQuality(imageId string) {
     qualityPath := filepath.Join(GetImageDir(imageId), "quality.txt")
     err = ioutil.WriteFile(qualityPath, []byte(qualityString), 0644)
     if err != nil {
-        log.Println(err.Error())
+        log.Println(err)
         return
     }
 }
@@ -384,6 +384,7 @@ func ParseBettyRequest(URLPath string) (BettyRequest, error) {
 	}
 	width, err := strconv.Atoi(submatches[3])
 	if err != nil {
+        log.Print(err)
 		return BettyRequest{}, err
 	}
 	var imageReq = BettyRequest{

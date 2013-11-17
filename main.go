@@ -31,6 +31,7 @@ type Config struct {
     CreditFont         string   `json:"creditFont"`    // The font used fo rhte image credits
     ElasticSearch      string   `json:"elasticsearch"` // An ElasticSearch URL
     ImgminEnabled      bool     `json:"imgminEnabled`  // imgmin emabled
+    Logfile            string   `json:"logfile"`       // A path to a log file
 }
 
 var (
@@ -84,6 +85,14 @@ func loadConfig() {
 
     if config.CreditFont == "" {
         config.CreditFont = "Courier-New"
+    }
+
+    if config.Logfile != "" {
+        f, err := os.OpenFile(config.Logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+        if err != nil {
+            os.Exit(1)
+        }
+        log.SetOutput(f)
     }
 
 	ratios = make([]image.Point, len(config.Ratios))
