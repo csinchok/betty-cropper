@@ -19,7 +19,7 @@ import (
     "github.com/rafikk/imagick/imagick"
 )
 
-var BETTY_VERSION = "1.4.2"
+var BETTY_VERSION = "1.4.3"
 
 type Config struct {
     ImageRoot          string   `json:"imageRoot"`     // Where we put out images
@@ -32,6 +32,7 @@ type Config struct {
     ElasticSearch      string   `json:"elasticsearch"` // An ElasticSearch URL
     ImgminEnabled      bool     `json:"imgminEnabled`  // imgmin emabled
     Logfile            string   `json:"logfile"`       // A path to a log file
+    Logger             *log.Logger  // The logger
 }
 
 var (
@@ -92,7 +93,7 @@ func loadConfig() {
         if err != nil {
             os.Exit(1)
         }
-        log.SetOutput(f)
+        config.Logger = log.New(f, "betty", 2)
     }
 
 	ratios = make([]image.Point, len(config.Ratios))
@@ -163,7 +164,7 @@ func crop(w http.ResponseWriter, r *http.Request) {
     mw.CropImage(width, height, selection.Min.X, selection.Min.Y)
     err = mw.ResizeImage(uint(imageReq.Width), uint(imageReq.Height()), imagick.FILTER_LANCZOS, 1)
     if err != nil {
-        log.Println(err)
+        config.Logger.Println(err)
     }
 
     if img.Credit != ""  && imageReq.Width > 250 {
@@ -186,11 +187,11 @@ func crop(w http.ResponseWriter, r *http.Request) {
         dx := (float64(selection.Max.X) * scale) - fontMetrics.TextWidth - 10
         err = mw.AnnotateImage(dw, dx, dy, 0, img.Credit)
         if err != nil {
-            log.Println(err)
+            config.Logger.Println(err)
         }
         err = mw.DrawImage(dw)
         if err != nil {
-            log.Println(err)
+            config.Logger.Println(err)
         }
         dw.Destroy()
     }
@@ -217,6 +218,8 @@ func crop(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 	}
     imageBytes := mw.GetImageBlob()
+
+    config.Logger.Println("Cropped: " + r.URL.Path)
     w.Write(imageBytes)
     outputFile.Write(imageBytes)
 
